@@ -1,6 +1,5 @@
 import { Image } from "expo-image"
 import { StyleSheet } from "react-native"
-
 import { HelloWave } from "@/components/hello-wave"
 import ParallaxScrollView from "@/components/parallax-scroll-view"
 import { ThemedText } from "@/components/themed-text"
