@@ -12,19 +12,19 @@ import { Ionicons } from "@expo/vector-icons"
 import { useState } from "react"
 import ImageViewer from "@/components/imageViewer"
 import Button from "@/components/Button"
-import { decode } from 'base64-arraybuffer';
+import { decode } from "base64-arraybuffer"
 import * as FileSystem from "expo-file-system/legacy"
 
 export default function HomeScreen() {
   const { profile } = useAuthContext()
   const [isLoading, setIsLoading] = useState(false)
   const [selectedImage, setSelectedImage] = useState<string | undefined>(
-    undefined,
+    undefined
   )
   const onSelectImage = async () => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      exif: true, // 讀取圖片細節 metadata
+      exif: true // 讀取圖片細節 metadata
     }
 
     const result = await ImagePicker.launchImageLibraryAsync(options)
@@ -34,7 +34,7 @@ export default function HomeScreen() {
   }
 
   const uploadImage = async () => {
-    if(selectedImage === undefined) return
+    if (selectedImage === undefined) return
     setIsLoading(true)
 
     // 要注意 react-native 上傳圖片到 supabase 需要用 base64, arrayBuffer 的方式才可以，不能使用 Blob
@@ -44,18 +44,18 @@ export default function HomeScreen() {
     // todo: 這邊需要再考慮未來要如何讀取使用者圖片，路徑要再想一下
     const filePath = `${Date.now()}_${selectedImage.fileName ?? "upload.jpg"}`
     const { data, error } = await supabase.storage
-      .from('avatars')
+      .from("avatars")
       .upload(filePath, arrayBuffer, {
         contentType: selectedImage.mimeType,
-        upsert: true,             // 如果要覆蓋原檔就打開
+        upsert: true             // 如果要覆蓋原檔就打開
       })
 
 
     if (error) {
-      console.error("Upload error:",error)
+      console.error("Upload error:", error)
     } else {
       setIsLoading(false)
-      console.log('upload success:', data)
+      console.log("upload success:", data)
     }
   }
 
@@ -106,25 +106,25 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 8
   },
   stepContainer: {
     gap: 8,
-    marginBottom: 8,
+    marginBottom: 8
   },
   reactLogo: {
     height: 178,
     width: 290,
     bottom: 0,
     left: 0,
-    position: "absolute",
+    position: "absolute"
   },
   imageContainer: {
-    flex: 1,
+    flex: 1
   },
   image: {
     width: 320,
     height: 440,
-    borderRadius: 18,
-  },
+    borderRadius: 18
+  }
 })
