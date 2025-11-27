@@ -1,18 +1,13 @@
-import { Image } from "expo-image"
-import { StyleSheet, TouchableOpacity } from "react-native"
-import { HelloWave } from "@/components/hello-wave"
-import ParallaxScrollView from "@/components/parallax-scroll-view"
-import { ThemedText } from "@/components/themed-text"
-import { ThemedView } from "@/components/themed-view"
+import { Text, TouchableOpacity } from "react-native"
 import { useAuthContext } from "@/hooks/use-auth-context"
 import * as ImagePicker from "expo-image-picker"
-import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+import { SafeAreaView } from "react-native-safe-area-context"
+import Octicons from "@expo/vector-icons/Octicons"
 
 export default function HomeScreen() {
   const { profile } = useAuthContext()
   const router = useRouter()
-  
   const onSelectImage = async () => {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -35,50 +30,19 @@ export default function HomeScreen() {
   }
 
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
-      headerImage={
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.reactLogo}
-        />
-      }
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!{profile?.full_name}</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <TouchableOpacity onPress={onSelectImage}>
-        <Ionicons name="camera-outline" size={30} color={"#fff"} />
-        <ThemedText type="title">選擇圖片</ThemedText>
+    <SafeAreaView className="bg-background h-full px-6">
+      <Text>Hi {profile?.full_name}</Text>
+      {/* 飲食概況 */}
+      <Text className="h1">飲食概況</Text>
+      {/* 已攝取熱量卡片 */}
+      {/* 今日餐點 */}
+
+      <TouchableOpacity
+        onPress={onSelectImage}
+        className="bg-primary rounded-full items-center justify-center w-16 h-16 !absolute bottom-12 right-10 z-10"
+      >
+        <Octicons name="diff-added" size={30} color="white" />
       </TouchableOpacity>
-    </ParallaxScrollView>
+    </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: "absolute",
-  },
-  imageContainer: {
-    flex: 1,
-  },
-  image: {
-    width: 320,
-    height: 440,
-    borderRadius: 18,
-  },
-})

@@ -3,18 +3,14 @@ import React from "react"
 
 import { HapticTab } from "@/components/haptic-tab"
 import { IconSymbol } from "@/components/ui/icon-symbol"
-import { Colors } from "@/constants/theme"
-import { useColorScheme } from "@/hooks/use-color-scheme"
 import Feather from "@expo/vector-icons/Feather"
 import Entypo from "@expo/vector-icons/Entypo"
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme()
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? "light"].tint,
+        tabBarActiveTintColor: '#2563eb', // primary color for tabs
         headerShown: false,
         tabBarButton: HapticTab,
       }}
@@ -33,7 +29,7 @@ export default function TabLayout() {
         options={{
           title: "Diary",
           tabBarIcon: ({ color }) => (
-            <Entypo name="images" size={24} color="black" />
+            <Entypo name="images" size={24} color={color} />
           ),
         }}
       />
@@ -43,7 +39,7 @@ export default function TabLayout() {
         options={{
           title: "Settings",
           tabBarIcon: ({ color }) => (
-            <Feather name="settings" size={24} color="black" />
+            <Feather name="settings" size={24} color={color} />
           ),
         }}
       />
