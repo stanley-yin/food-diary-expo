@@ -1,72 +1,57 @@
-import { StyleSheet, View, Pressable, Text } from "react-native"
-import FontAwesome from "@expo/vector-icons/FontAwesome"
+import React, { ButtonHTMLAttributes } from "react"
+import { Text, TouchableOpacity } from "react-native"
 
-type Props = {
-  label: string
-  theme?: "primary"
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: "primary" | "secondary" | "soft" | "danger" | "ghost"
+  size?: "sm" | "md" | "lg" | "icon"
+  fullWidth?: boolean
+  isLoading?: boolean
+  leftIcon?: React.ReactNode
   onPress?: () => void
 }
 
-export default function Button({ label, theme, onPress }: Props) {
-  if (theme === "primary") {
-    return (
-      <View
-        style={[
-          styles.buttonContainer,
-          { borderWidth: 4, borderColor: "#ffd33d", borderRadius: 18 },
-        ]}
-      >
-        <Pressable
-          style={[styles.button, { backgroundColor: "#fff" }]}
-          onPress={onPress}
-        >
-          <FontAwesome
-            name="picture-o"
-            size={18}
-            color="#25292e"
-            style={styles.buttonIcon}
-          />
-          <Text style={[styles.buttonLabel, { color: "#25292e" }]}>
-            {label}
-          </Text>
-        </Pressable>
-      </View>
-    )
+const ThemeButton: React.FC<ButtonProps> = ({
+  title,
+  variant = "primary",
+  size = "md",
+  fullWidth = false,
+  isLoading = false,
+  leftIcon,
+  className = "",
+  disabled,
+  onPress,
+}) => {
+  const baseStyles =
+    "inline-flex items-center justify-center font-bold transition-all duration-200 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+
+  const variants = {
+    primary:
+      "bg-blue-600 text-white shadow-lg shadow-blue-200 hover:bg-blue-700",
+    secondary:
+      "bg-white text-blue-600 border border-blue-200 shadow-sm hover:bg-gray-50",
+    soft: "bg-blue-100 text-blue-700 hover:bg-blue-200",
+    danger: "bg-white text-red-500 hover:bg-red-50",
+    ghost: "bg-transparent text-gray-500 hover:bg-gray-100",
   }
 
+  const sizes = {
+    sm: "text-xs px-3 py-1.5 rounded-lg",
+    md: "text-sm px-4 py-3 rounded-xl",
+    lg: "text-lg px-6 py-4 rounded-2xl",
+    icon: "p-2 rounded-full aspect-square",
+  }
+
+  const widthClass = fullWidth ? "w-full" : ""
+
   return (
-    <View style={styles.buttonContainer}>
-      <Pressable style={styles.button} onPress={onPress}>
-        <Text style={[styles.buttonLabel, { color: "#25292e" }]}>
-          {label}
-        </Text>
-      </Pressable>
-    </View>
+    <TouchableOpacity
+      onPress={onPress}
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${className}`}
+      disabled={disabled || isLoading}
+    >
+      <Text>{title}</Text>
+    </TouchableOpacity>
   )
 }
 
-const styles = StyleSheet.create({
-  buttonContainer: {
-    width: 320,
-    height: 68,
-    marginHorizontal: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 3,
-  },
-  button: {
-    borderRadius: 10,
-    width: "100%",
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-  },
-  buttonIcon: {
-    paddingRight: 8,
-  },
-  buttonLabel: {
-    color: "#fff",
-    fontSize: 16,
-  },
-})
+export default ThemeButton
