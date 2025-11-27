@@ -27,6 +27,12 @@ function RootNavigator() {
         <Stack.Screen name="login" options={{ headerShown: false }} />
       </Stack.Protected>
       <Stack.Screen name="+not-found" />
+      <Stack.Screen
+        name="modal/confirm"
+        options={{
+          presentation: "modal",
+        }}
+      />
     </Stack>
   )
 }
