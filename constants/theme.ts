@@ -1,53 +1,116 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
+import { createThemes, defaultComponentThemes } from '@tamagui/theme-builder'
+import * as Colors from '@tamagui/colors'
 
-import { Platform } from 'react-native';
+const darkPalette = ['hsla(206, 82%, 6%, 1)','hsla(206, 82%, 11%, 1)','hsla(206, 82%, 16%, 1)','hsla(206, 82%, 21%, 1)','hsla(206, 82%, 26%, 1)','hsla(206, 82%, 30%, 1)','hsla(206, 82%, 35%, 1)','hsla(206, 82%, 40%, 1)','hsla(206, 82%, 45%, 1)','hsla(206, 82%, 50%, 1)','hsla(0, 15%, 93%, 1)','hsla(0, 15%, 99%, 1)']
+const lightPalette = ['hsla(206, 82%, 59%, 1)','hsla(206, 82%, 58%, 1)','hsla(206, 82%, 57%, 1)','hsla(206, 82%, 56%, 1)','hsla(206, 82%, 55%, 1)','hsla(206, 82%, 54%, 1)','hsla(206, 82%, 53%, 1)','hsla(206, 82%, 52%, 1)','hsla(206, 82%, 51%, 1)','hsla(206, 82%, 50%, 1)','hsla(0, 15%, 15%, 1)','hsla(0, 15%, 1%, 1)']
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+const lightShadows = {
+  shadow1: 'rgba(0,0,0,0.04)',
+  shadow2: 'rgba(0,0,0,0.08)',
+  shadow3: 'rgba(0,0,0,0.16)',
+  shadow4: 'rgba(0,0,0,0.24)',
+  shadow5: 'rgba(0,0,0,0.32)',
+  shadow6: 'rgba(0,0,0,0.4)',
+}
 
-export const Colors = {
-  light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-  },
-  dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
-  },
-};
+const darkShadows = {
+  shadow1: 'rgba(0,0,0,0.2)',
+  shadow2: 'rgba(0,0,0,0.3)',
+  shadow3: 'rgba(0,0,0,0.4)',
+  shadow4: 'rgba(0,0,0,0.5)',
+  shadow5: 'rgba(0,0,0,0.6)',
+  shadow6: 'rgba(0,0,0,0.7)',
+}
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
+// we're adding some example sub-themes for you to show how they are done, "success" "warning", "error":
+
+const builtThemes = createThemes({
+  componentThemes: defaultComponentThemes,
+
+  base: {
+    palette: {
+      dark: darkPalette,
+      light: lightPalette,
+    },
+
+    extra: {
+      light: {
+        ...Colors.green,
+        ...Colors.red,
+        ...Colors.yellow,
+        ...lightShadows,
+        shadowColor: lightShadows.shadow1,
+      },
+      dark: {
+        ...Colors.greenDark,
+        ...Colors.redDark,
+        ...Colors.yellowDark,
+        ...darkShadows,
+        shadowColor: darkShadows.shadow1,
+      },
+    },
   },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
+
+  accent: {
+    palette: {
+      dark: ['hsla(250, 50%, 35%, 1)','hsla(250, 50%, 38%, 1)','hsla(250, 50%, 41%, 1)','hsla(250, 50%, 43%, 1)','hsla(250, 50%, 46%, 1)','hsla(250, 50%, 49%, 1)','hsla(250, 50%, 52%, 1)','hsla(250, 50%, 54%, 1)','hsla(250, 50%, 57%, 1)','hsla(250, 50%, 60%, 1)','hsla(250, 50%, 90%, 1)','hsla(250, 50%, 95%, 1)'],
+      light: ['hsla(250, 50%, 40%, 1)','hsla(250, 50%, 43%, 1)','hsla(250, 50%, 46%, 1)','hsla(250, 50%, 48%, 1)','hsla(250, 50%, 51%, 1)','hsla(250, 50%, 54%, 1)','hsla(250, 50%, 57%, 1)','hsla(250, 50%, 59%, 1)','hsla(250, 50%, 62%, 1)','hsla(250, 50%, 65%, 1)','hsla(250, 50%, 95%, 1)','hsla(250, 50%, 95%, 1)'],
+    },
   },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+
+  childrenThemes: {
+    warning: {
+      palette: {
+        dark: Object.values(Colors.yellowDark),
+        light: Object.values(Colors.yellow),
+      },
+    },
+
+    error: {
+      palette: {
+        dark: Object.values(Colors.redDark),
+        light: Object.values(Colors.red),
+      },
+    },
+
+    success: {
+      palette: {
+        dark: Object.values(Colors.greenDark),
+        light: Object.values(Colors.green),
+      },
+    },
   },
-});
+
+  // optionally add more, can pass palette or template
+
+  // grandChildrenThemes: {
+  //   alt1: {
+  //     template: 'alt1',
+  //   },
+  //   alt2: {
+  //     template: 'alt2',
+  //   },
+  //   surface1: {
+  //     template: 'surface1',
+  //   },
+  //   surface2: {
+  //     template: 'surface2',
+  //   },
+  //   surface3: {
+  //     template: 'surface3',
+  //   },
+  // },
+})
+
+export type Themes = typeof builtThemes
+
+// the process.env conditional here is optional but saves web client-side bundle
+// size by leaving out themes JS. tamagui automatically hydrates themes from CSS
+// back into JS for you, and the bundler plugins set TAMAGUI_ENVIRONMENT. so
+// long as you are using the Vite, Next, Webpack plugins this should just work,
+// but if not you can just export builtThemes directly as themes:
+export const themes: Themes =
+  process.env.TAMAGUI_ENVIRONMENT === 'client' &&
+  process.env.NODE_ENV === 'production'
+    ? ({} as any)
+    : (builtThemes as any)

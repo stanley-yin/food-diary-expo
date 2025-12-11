@@ -13,6 +13,8 @@ import { SplashScreenController } from "@/components/splash-screen-controller"
 import { useAuthContext } from "@/hooks/use-auth-context"
 import { useColorScheme } from "@/hooks/use-color-scheme"
 import AuthProvider from "@/providers/auth-provider"
+import { TamaguiProvider } from "tamagui"
+import tamaguiConfig from "@/tamagui.config"
 
 // Separate RootNavigator so we can access the AuthContext
 function RootNavigator() {
@@ -41,12 +43,14 @@ export default function RootLayout() {
   const colorScheme = useColorScheme()
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <AuthProvider>
-        <SplashScreenController />
-        <RootNavigator />
-        <StatusBar style="auto" />
-      </AuthProvider>
-    </ThemeProvider>
+    <TamaguiProvider config={tamaguiConfig} defaultTheme={colorScheme!}>
+      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <AuthProvider>
+          <SplashScreenController />
+          <RootNavigator />
+          <StatusBar style="auto" />
+        </AuthProvider>
+      </ThemeProvider>
+    </TamaguiProvider>
   )
 }

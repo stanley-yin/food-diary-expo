@@ -8,6 +8,13 @@ import { useAuthContext } from "@/hooks/use-auth-context"
 import * as ImagePicker from "expo-image-picker"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
+<<<<<<< Updated upstream
+=======
+import { SafeAreaView } from "react-native-safe-area-context"
+import Octicons from "@expo/vector-icons/Octicons"
+import ImageViewer from "@/components/imageViewer"
+import { Card, H2 } from "tamagui" // or '@tamagui/card'
+>>>>>>> Stashed changes
 
 export default function HomeScreen() {
   const { profile } = useAuthContext()
@@ -52,7 +59,35 @@ export default function HomeScreen() {
         <Ionicons name="camera-outline" size={30} color={"#fff"} />
         <ThemedText type="title">選擇圖片</ThemedText>
       </TouchableOpacity>
+<<<<<<< Updated upstream
     </ParallaxScrollView>
+=======
+      <ScrollView>
+        <Card className="bg-primary">
+          <Card.Header>
+            <H2>Sony A7IV</H2>
+          </Card.Header>
+          <Card.Footer />
+          {/* any other components */}
+          <Card.Background />
+        </Card>
+        <Button title="get data" onPress={getData} />
+        {meals && (
+          <View>
+            {meals.map((item, index) => {
+              return (
+                <View key={index}>
+                  <ImageViewer imgSource={item.img_url} />
+                  <Text>{item.name}</Text>
+                  <Text>{item.datetime}</Text>
+                </View>
+              )
+            })}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+>>>>>>> Stashed changes
   )
 }
 
