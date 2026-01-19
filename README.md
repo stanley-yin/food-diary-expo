@@ -1,50 +1,124 @@
-# Welcome to your Expo app 👋
+# 🥗 Food Diary (WIP)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> A mobile-first food diary app designed to reduce friction in diet tracking during fitness training.
 
-## Get started
+🚧 **This project is a work in progress.**  
+This repository documents both the **implementation** and the **technical decision-making process**.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## Problem
 
-2. Start the app
+During fitness training, users often need to report their daily meals to coaches.  
+Using chat apps like LINE usually requires manually typing:
 
-   ```bash
-   npx expo start
-   ```
+- Meal time
+- Food details
+- Context for each photo
 
-In the output, you'll find options to open the app in a
+This process is time-consuming and makes it difficult to **review, analyze, or track progress** over time.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Solution
 
-## Get a fresh project
+Food Diary minimizes manual effort when logging meals:
 
-When you're ready, run:
+- Users upload meal photos via a mobile app
+- Photo **metadata (e.g. capture time)** is automatically extracted
+- An image analysis API generates **food-related tags**
+- Centralized records make it easier to:
+    - Review personal diet history
+    - Analyze patterns using tags
+    - Share insights with coaches or others in the future
 
-```bash
-npm run reset-project
-```
+---
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Project Goals
 
-## Learn more
+1. Solve a real-life problem
+2. Practice modern mobile development with **React Native and Expo**
+3. Build a production-minded project for a future portfolio
 
-To learn more about developing your project with Expo, look at the following resources:
+---
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Architecture Overview
 
-## Join the community
+### Core Features
 
-Join our community of developers creating universal apps.
+- Google authentication
+- Photo upload
+- Image metadata extraction
+- Image recognition and tag generation
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+---
+
+### Planned Features
+
+- Food calendar
+    - Monthly / weekly / daily views
+- Meal feedback and evaluation by others (e.g. coaches)
+- Multi-tenant support (coach / trainee)
+
+---
+
+## Tech Stack
+
+### Frontend (Mobile App)
+
+- React Native
+- Expo
+- TypeScript
+- Expo Image Picker
+- React Hook Form
+
+### Backend / BaaS
+
+- Supabase
+    - Authentication (Google OAuth)
+    - Database
+    - Storage (image uploads)
+
+### Image Analysis
+
+- Gemini API
+
+### Code Quality
+
+- ESLint
+- Prettier
+
+### Deployment
+
+- Expo (EAS)
+- Supabase Cloud
+
+---
+
+## Database Schema (Draft)
+
+> Subject to change as the project evolves
+
+- users
+- food_logs
+- food_images
+- tags
+- food_log_tags
+
+---
+
+## Roadmap
+
+- [ ] Google OAuth authentication
+- [ ] Image upload with metadata extraction
+- [ ] Image analysis and tag generation
+- [ ] Basic food diary list
+- [ ] Calendar view
+- [ ] Tag-based statistics and insights
+
+---
+
+## Notes
+
+This project is intentionally developed incrementally.  
+Some implementations may be temporary and refactored as the architecture matures.
