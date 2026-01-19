@@ -20,6 +20,7 @@
     "@react-oauth/google": "^0.12.2",
     "@supabase/supabase-js": "^2.78.0",
     "base64-arraybuffer": "1.0.2",
+    "dayjs": "1.11.19",
     "expo": "~54.0.22",
     "expo-constants": "~18.0.10",
     "expo-font": "~14.0.9",
