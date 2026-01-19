@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase.web"
 import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
+import ThemeButton from "@/components/Button"
 
 export default function ConfirmModalScreen() {
   const router = useRouter()
@@ -14,7 +15,6 @@ export default function ConfirmModalScreen() {
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const { imgUri, date, mimeType, fileName } = Array.isArray(params) ? params[0] : params
 
-  const [showPicker, setShowPicker] = useState(false)
   const {
     control,
     handleSubmit,
@@ -75,52 +75,53 @@ export default function ConfirmModalScreen() {
     <View className="mx-auto py-10">
       <View>
         <ImageViewer imgSource={imgUri} selectedImage={imgUri} />
-        <Text>照片日期：{date}</Text>
         <View>
           <Controller
             control={control}
             name="name"
             rules={{ required: "name is required" }}
             render={({ field: { onChange, value } }) => (
-              <TextInput
-                value={value}
-                onChangeText={onChange}
-                placeholder="food name"
-                className="border p-2 mb-4"
-              />
+              <View className="flex-row items-center py-4 gap-4">
+                <Text className="h3 ">用餐品項：</Text>
+                <TextInput
+                  value={value}
+                  onChangeText={onChange}
+                  placeholder="food name"
+                />
+              </View>
             )}
           />
           <Controller
             control={control}
             name="datetime"
             render={({ field: { onChange, value } }) => (
-              <>
-                <Button title="Pick Date" onPress={() => setShowPicker(true)} />
-                {showPicker && (
-                  <DateTimePicker
-                    value={value}
-                    mode="datetime"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                      if (selectedDate) onChange(selectedDate) // 更新 RHF value
-                    }}
-                  />
-                )}
-                <Text>Selected: {value?.toLocaleString()}</Text>
-              </>
+              <View className="flex-row items-center">
+                <Text className="h3">用餐時間：</Text>
+                <DateTimePicker
+                  value={value}
+                  mode="datetime"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    if (selectedDate) onChange(selectedDate) // 更新 RHF value
+                  }}
+                />
+              </View>
             )}
           />
         </View>
-        <View className="flex flex-row justify-between">
-          <Button
+        <View className="flex mt-10 flex-row justify-between">
+          <ThemeButton
+            size={"lg"}
+            variant={"ghost"}
             title="重新選擇"
             disabled={isLoading}
             onPress={() => router.back()}
           />
-          <Button
-            title="確認使用"
-            onPress={handleSubmit(uploadImage)}
+          <ThemeButton
+            size={"lg"}
+            title="上傳"
             disabled={isLoading}
+            onPress={handleSubmit(uploadImage)}
           />
         </View>
       </View>
