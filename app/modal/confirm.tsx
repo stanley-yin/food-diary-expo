@@ -1,4 +1,4 @@
-import { Button, Text, TextInput, View } from "react-native"
+import { Text, TextInput, View } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import ImageViewer from "@/components/imageViewer"
 import * as FileSystem from "expo-file-system/legacy"
@@ -8,21 +8,22 @@ import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
+import TagInput from "@/components/TagInput"
 
 export default function ConfirmModalScreen() {
   const router = useRouter()
   const params = useLocalSearchParams()
   const [isLoading, setIsLoading] = useState<boolean>(false)
-  const { imgUri, date, mimeType, fileName } = Array.isArray(params) ? params[0] : params
+  const [tags, setTags] = useState<string[]>([])
+  const { imgUri, date, mimeType, fileName } = Array.isArray(params)
+    ? params[0]
+    : params
 
-  const {
-    control,
-    handleSubmit,
-  } = useForm({
+  const { control, handleSubmit } = useForm({
     defaultValues: {
-      name:'',
-      datetime: new Date(date.replace(/:/, '-').replace(/:/, '-')), // EXIF 不是標準 ISO 格式
-    }
+      name: "",
+      datetime: new Date(date.replace(/:/, "-").replace(/:/, "-")), // EXIF 不是標準 ISO 格式
+    },
   })
 
   const uploadImage = async (data: { datetime: Date; name: string }) => {
@@ -51,14 +52,45 @@ export default function ConfirmModalScreen() {
 
       if (storageError) throw storageError
 
-      const { error: mealError } = await supabase.from("meals").insert({
-        datetime: data.datetime.toISOString(),
-        name: data.name,
-        user_id: user?.id,
-        img_url: storageData.path, // 使用上傳成功的路徑
-      })
+      const { data: meal, error: mealError } = await supabase
+        .from("meals")
+        .insert({
+          datetime: data.datetime.toISOString(),
+          name: data.name,
+          user_id: user?.id,
+          img_url: storageData.path, // 使用上傳成功的路徑
+        })
+        .select()
 
       if (mealError) throw mealError
+
+      // 使用 state 中的 tags
+      const tagNames = tags
+      if (tagNames.length > 0) {
+        // 2. 批量處理標籤 (使用 upsert：若名稱重複則不新增，直接回傳)
+        const tagObjects = tagNames.map((name) => ({ name }))
+        const { data: tagsData, error: tagError } = await supabase
+          .from("food_tags")
+          .upsert(tagObjects, { onConflict: "name" }) // 根據 name 判斷是否重複
+          .select()
+
+        if (tagError) {
+          console.error("Error upserting tags:", tagError)
+          // 決定是否要中斷流程
+        } else if (tagsData) {
+          // 3. 建立關聯到橋接表 meal_food_tags
+          const junctionData = tagsData.map((tag) => ({
+            meal_id: meal[0].id,
+            tag_id: tag.id,
+          }))
+
+          const { error: linkError } = await supabase
+            .from("meal_food_tags")
+            .insert(junctionData)
+
+          if (linkError) console.error("Error linking tags:", linkError)
+        }
+      }
 
       console.log("upload success")
       router.back()
@@ -70,32 +102,17 @@ export default function ConfirmModalScreen() {
     }
   }
 
-
   return (
-    <View className="mx-auto py-10">
+    <View className="mx-auto py-10 w-full px-4">
       <View>
         <ImageViewer imgSource={imgUri} selectedImage={imgUri} />
         <View>
-          <Controller
-            control={control}
-            name="name"
-            rules={{ required: "name is required" }}
-            render={({ field: { onChange, value } }) => (
-              <View className="flex-row items-center py-4 gap-4">
-                <Text className="h3 ">用餐品項：</Text>
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="food name"
-                />
-              </View>
-            )}
-          />
+          <TagInput tags={tags} setTags={setTags} label="食物標籤：" />
           <Controller
             control={control}
             name="datetime"
             render={({ field: { onChange, value } }) => (
-              <View className="flex-row items-center">
+              <View className="flex-row items-center py-4">
                 <Text className="h3">用餐時間：</Text>
                 <DateTimePicker
                   value={value}
