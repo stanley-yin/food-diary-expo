@@ -10,12 +10,10 @@ import ImageViewer from "@/components/imageViewer"
 import dayjs from "dayjs"
 
 type mealItem = {
-  created_at: Date,
-  datetime: Date,
-  id: string,
-  img_url: string,
-  name: string,
-  user_id: string,
+  datetime: Date
+  id: string
+  img_url: string
+  food_tags: { id: string; name: string }[]
 }
 
 export default function HomeScreen() {
@@ -45,31 +43,39 @@ export default function HomeScreen() {
   }
 
   const getData = async () => {
-    const start = dayjs().startOf('day').toISOString();
-    const end = dayjs().endOf('day').toISOString();
+    const start = dayjs().startOf("day").toISOString()
+    const end = dayjs().endOf("day").toISOString()
 
-    const { data} = await supabase
+    const { data } = await supabase
       .from("meals")
-      .select()
-      .gte("datetime", start) // Greater Than or Equal (>=)
-      .lte("datetime", end) // Less Than or Equal (<=)
+      .select(
+        `
+            id,
+            img_url,
+            datetime,
+            food_tags (
+              id,
+              name
+            )
+          `,
+      )
+      .gte("created_at", start) // Greater Than or Equal (>=)
+      .lte("created_at", end) // Less Than or Equal (<=)
 
-    if(!data){
+    if (!data) {
       return []
     }
 
-
-
-    const result:mealItem[] =  []
+    const result: mealItem[] = []
     for (let i = 0; i < data?.length; i++) {
       const item = data[i]
       const { data: imageData } = await supabase.storage
         .from("avatars")
-        .createSignedUrl("1768787914590_IMG_0005.jpeg", 3600)
+        .createSignedUrl(item.img_url, 3600)
 
       const obj = {
         ...item,
-        img_url: imageData?.signedUrl,
+        img_url: imageData?.signedUrl || "",
       }
       result.push(obj)
     }
@@ -90,9 +96,16 @@ export default function HomeScreen() {
       <ScrollView>
         {meals.map((meal, index) => (
           <View key={index}>
-            <Text>{meal.name}</Text>
+            <ImageViewer
+              imgSource={meal.img_url}
+              selectedImage={meal.img_url}
+            />
+            <View>
+              {meal.food_tags.map((item) => (
+                <Text key={item.id}>{item.name}</Text>
+              ))}
+            </View>
             <Text>{meal.datetime.toString()}</Text>
-            <ImageViewer imgSource={meal.img_url} selectedImage={meal.img_url}  />
           </View>
         ))}
       </ScrollView>
