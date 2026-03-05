@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
@@ -40,12 +39,10 @@ export default function ConfirmModalScreen() {
     : params
 
   const { control, handleSubmit } = useForm<{
-    name: string
     label: MealLabelKey
     datetime: Date
   }>({
     defaultValues: {
-      name: "",
       label: "breakfast",
       datetime: parseExifDate(date), // EXIF 不是標準 ISO 格式
     },
@@ -53,7 +50,6 @@ export default function ConfirmModalScreen() {
 
   const uploadImage = async (data: {
     datetime: Date
-    name: string
     label: MealLabelKey
   }) => {
     if (!imgUri) return
@@ -85,7 +81,6 @@ export default function ConfirmModalScreen() {
         .from("meals")
         .insert({
           datetime: data.datetime.toISOString(),
-          name: data.name,
           label: data.label,
           user_id: user?.id,
           img_url: storageData.path, // 使用上傳成功的路徑
@@ -156,9 +151,7 @@ export default function ConfirmModalScreen() {
       >
         <View className="mb-6">
           <Text className="text-2xl font-bold text-slate-900">確認這餐內容</Text>
-          <Text className="mt-1 text-sm text-slate-500">
-            調整名稱、時間與標籤後即可上傳
-          </Text>
+          <Text className="mt-1 text-sm text-slate-500">調整時間與標籤後即可上傳</Text>
         </View>
 
         <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
@@ -170,23 +163,6 @@ export default function ConfirmModalScreen() {
         </View>
 
         <View className="mt-5 gap-5 rounded-3xl border border-slate-200 bg-white p-5">
-          <Controller
-            control={control}
-            name="name"
-            render={({ field: { onChange, value } }) => (
-              <View className="gap-2">
-                <Text className="h3">餐點名稱</Text>
-                <TextInput
-                  value={value}
-                  onChangeText={onChange}
-                  placeholder="例如：訓練後晚餐"
-                  placeholderTextColor="#94a3b8"
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800"
-                />
-              </View>
-            )}
-          />
-
           <Controller
             control={control}
             name="label"

@@ -4,7 +4,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
@@ -22,7 +21,6 @@ import {
 } from "@/constants/meal-label"
 
 type FormValues = {
-  name: string
   label: MealLabelKey
   datetime: Date
 }
@@ -60,7 +58,6 @@ export default function EditMealModalScreen() {
 
   const { control, handleSubmit, reset } = useForm<FormValues>({
     defaultValues: {
-      name: "",
       label: "breakfast",
       datetime: new Date(),
     },
@@ -79,7 +76,6 @@ export default function EditMealModalScreen() {
           .select(
             `
             id,
-            name,
             label,
             datetime,
             food_tags (
@@ -99,7 +95,6 @@ export default function EditMealModalScreen() {
             : "breakfast"
 
         reset({
-          name: data.name || "",
           label: initialLabel,
           datetime: parseIsoDate(data.datetime),
         })
@@ -115,7 +110,7 @@ export default function EditMealModalScreen() {
   }, [mealId, reset])
 
   const handleUpdateMeal = async (formData: FormValues) => {
-    if (!mealId) return
+    if (!mealId || isFetching) return
     setIsLoading(true)
 
     try {
@@ -126,7 +121,6 @@ export default function EditMealModalScreen() {
       const { error: mealError } = await supabase
         .from("meals")
         .update({
-          name: formData.name,
           label: formData.label,
           datetime: formData.datetime.toISOString(),
         })
@@ -202,7 +196,7 @@ export default function EditMealModalScreen() {
         <View className="mb-6">
           <Text className="text-2xl font-bold text-slate-900">編輯餐點</Text>
           <Text className="mt-1 text-sm text-slate-500">
-            調整內容後按下儲存更新
+            調整時間與標籤後按下儲存更新
           </Text>
         </View>
 
@@ -221,23 +215,6 @@ export default function EditMealModalScreen() {
             <Text className="text-slate-500">資料讀取中...</Text>
           ) : (
             <>
-              <Controller
-                control={control}
-                name="name"
-                render={({ field: { onChange, value } }) => (
-                  <View className="gap-2">
-                    <Text className="h3">餐點名稱</Text>
-                    <TextInput
-                      value={value}
-                      onChangeText={onChange}
-                      placeholder="例如：訓練後晚餐"
-                      placeholderTextColor="#94a3b8"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800"
-                    />
-                  </View>
-                )}
-              />
-
               <Controller
                 control={control}
                 name="label"
@@ -311,9 +288,11 @@ export default function EditMealModalScreen() {
           />
           <ThemeButton
             size={"md"}
-            title={isLoading ? "儲存中..." : "儲存變更"}
-            className="flex-1"
-            disabled={isLoading || isFetching}
+            title={
+              isFetching ? "資料讀取中..." : isLoading ? "儲存中..." : "儲存變更"
+            }
+            className={`flex-1 ${isFetching ? "bg-slate-400" : ""}`}
+            disabled={isLoading}
             onPress={handleSubmit(handleUpdateMeal)}
           />
         </View>

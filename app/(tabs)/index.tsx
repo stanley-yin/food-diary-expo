@@ -22,7 +22,6 @@ import { MEAL_LABEL_MAP, type MealLabelKey } from "@/constants/meal-label"
 type mealItem = {
   datetime: string
   id: string
-  name?: string | null
   label?: MealLabelKey | null
   img_url: string
   food_tags: { id: string; name: string }[]
@@ -112,7 +111,6 @@ export default function HomeScreen() {
       .select(
         `
             id,
-            name,
             label,
             img_url,
             datetime,
@@ -216,17 +214,25 @@ export default function HomeScreen() {
 
             <View className="gap-3 px-4 py-4">
               <View className="flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-slate-900">
-                  {meal.name || "未命名餐點"}
-                </Text>
-                {!!meal.label && (
+                {!!meal.label ? (
                   <View className="rounded-full bg-amber-100 px-3 py-1">
                     <Text className="text-xs font-semibold text-amber-700">
                       {MEAL_LABEL_MAP[meal.label]}
                     </Text>
                   </View>
+                ) : (
+                  <View className="rounded-full bg-slate-100 px-3 py-1">
+                    <Text className="text-xs font-semibold text-slate-500">
+                      未設定
+                    </Text>
+                  </View>
                 )}
+                <Text className="text-xs font-medium text-slate-400">
+                  {dayjs(meal.datetime).format("YYYY/MM/DD HH:mm")}
+                </Text>
               </View>
+
+              <View className="h-px bg-slate-100" />
 
               <View className="flex-row flex-wrap gap-2">
                 {meal.food_tags.length === 0 && (
@@ -243,9 +249,7 @@ export default function HomeScreen() {
                   </View>
                 ))}
               </View>
-              <Text className="text-xs text-slate-400">
-                {dayjs(meal.datetime).format("YYYY/MM/DD HH:mm")}
-              </Text>
+
             </View>
           </View>
         ))}
