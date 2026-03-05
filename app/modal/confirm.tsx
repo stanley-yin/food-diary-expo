@@ -1,6 +1,7 @@
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   TextInput,
@@ -16,6 +17,11 @@ import { Controller, useForm } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
 import TagInput from "@/components/TagInput"
+import {
+  MEAL_LABEL_MAP,
+  MEAL_LABEL_OPTIONS,
+  type MealLabelKey,
+} from "@/constants/meal-label"
 
 const parseExifDate = (rawDate?: string | string[]) => {
   const normalized = Array.isArray(rawDate) ? rawDate[0] : rawDate
@@ -33,14 +39,23 @@ export default function ConfirmModalScreen() {
     ? params[0]
     : params
 
-  const { control, handleSubmit } = useForm({
+  const { control, handleSubmit } = useForm<{
+    name: string
+    label: MealLabelKey
+    datetime: Date
+  }>({
     defaultValues: {
       name: "",
+      label: "breakfast",
       datetime: parseExifDate(date), // EXIF 不是標準 ISO 格式
     },
   })
 
-  const uploadImage = async (data: { datetime: Date; name: string }) => {
+  const uploadImage = async (data: {
+    datetime: Date
+    name: string
+    label: MealLabelKey
+  }) => {
     if (!imgUri) return
     setIsLoading(true)
 
@@ -71,6 +86,7 @@ export default function ConfirmModalScreen() {
         .insert({
           datetime: data.datetime.toISOString(),
           name: data.name,
+          label: data.label,
           user_id: user?.id,
           img_url: storageData.path, // 使用上傳成功的路徑
         })
@@ -154,6 +170,43 @@ export default function ConfirmModalScreen() {
                   placeholderTextColor="#94a3b8"
                   className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800"
                 />
+              </View>
+            )}
+          />
+
+          <Controller
+            control={control}
+            name="label"
+            render={({ field: { onChange, value } }) => (
+              <View className="gap-2">
+                <Text className="h3">餐別</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {MEAL_LABEL_OPTIONS.map((option) => {
+                    const isActive = value === option.value
+                    return (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => onChange(option.value)}
+                        className={`rounded-full border px-4 py-2 ${
+                          isActive
+                            ? "border-blue-600 bg-blue-600"
+                            : "border-slate-200 bg-slate-50"
+                        }`}
+                      >
+                        <Text
+                          className={`text-sm font-semibold ${
+                            isActive ? "text-white" : "text-slate-600"
+                          }`}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    )
+                  })}
+                </View>
+                <Text className="text-xs text-slate-400">
+                  目前選擇：{MEAL_LABEL_MAP[value]}
+                </Text>
               </View>
             )}
           />

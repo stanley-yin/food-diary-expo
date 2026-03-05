@@ -9,11 +9,13 @@ import { useCallback, useState } from "react"
 import ImageViewer from "@/components/imageViewer"
 import dayjs from "dayjs"
 import { useFocusEffect } from "@react-navigation/native"
+import { MEAL_LABEL_MAP, type MealLabelKey } from "@/constants/meal-label"
 
 type mealItem = {
   datetime: string
   id: string
   name?: string | null
+  label?: MealLabelKey | null
   img_url: string
   food_tags: { id: string; name: string }[]
 }
@@ -54,6 +56,7 @@ export default function HomeScreen() {
         `
             id,
             name,
+            label,
             img_url,
             datetime,
             food_tags (
@@ -142,6 +145,13 @@ export default function HomeScreen() {
                 <Text className="text-lg font-bold text-slate-900">
                   {meal.name || "未命名餐點"}
                 </Text>
+                {!!meal.label && (
+                  <View className="rounded-full bg-amber-100 px-3 py-1">
+                    <Text className="text-xs font-semibold text-amber-700">
+                      {MEAL_LABEL_MAP[meal.label]}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <View className="flex-row flex-wrap gap-2">
