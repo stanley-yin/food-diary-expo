@@ -42,6 +42,13 @@ const ThemeButton: React.FC<ButtonProps> = ({
   }
 
   const widthClass = fullWidth ? "w-full" : ""
+  const textVariants = {
+    primary: "text-white",
+    secondary: "text-blue-600",
+    soft: "text-blue-700",
+    danger: "text-red-500",
+    ghost: "text-gray-500",
+  }
 
   return (
     <TouchableOpacity
@@ -49,7 +56,7 @@ const ThemeButton: React.FC<ButtonProps> = ({
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${widthClass} ${className}`}
       disabled={disabled || isLoading}
     >
-      <Text>{title}</Text>
+      <Text className={`font-semibold ${textVariants[variant]}`}>{title}</Text>
     </TouchableOpacity>
   )
 }
