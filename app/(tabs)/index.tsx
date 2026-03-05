@@ -1,9 +1,17 @@
-import { ScrollView, Text, TouchableOpacity, View } from "react-native"
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native"
 import { useAuthContext } from "@/hooks/use-auth-context"
 import * as ImagePicker from "expo-image-picker"
 import { useRouter } from "expo-router"
 import { SafeAreaView } from "react-native-safe-area-context"
 import Octicons from "@expo/vector-icons/Octicons"
+import Feather from "@expo/vector-icons/Feather"
 import { supabase } from "@/lib/supabase.web"
 import { useCallback, useState } from "react"
 import ImageViewer from "@/components/imageViewer"
@@ -24,6 +32,7 @@ export default function HomeScreen() {
   const { profile } = useAuthContext()
   const router = useRouter()
   const [meals, setMeals] = useState<mealItem[]>([])
+  const [deletingMealId, setDeletingMealId] = useState<string | null>(null)
 
   const onSelectImage = async () => {
     const options: ImagePicker.ImagePickerOptions = {
@@ -44,6 +53,54 @@ export default function HomeScreen() {
         },
       })
     }
+  }
+
+  const onEditMeal = (meal: mealItem) => {
+    router.push({
+      pathname: "/modal/edit-meal",
+      params: {
+        mealId: meal.id,
+        imgUri: meal.img_url,
+      },
+    })
+  }
+
+  const onDeleteMeal = async (mealId: string) => {
+    setDeletingMealId(mealId)
+    try {
+      const { error: deleteLinkError } = await supabase
+        .from("meal_food_tags")
+        .delete()
+        .eq("meal_id", mealId)
+
+      if (deleteLinkError) throw deleteLinkError
+
+      const { error: deleteMealError } = await supabase
+        .from("meals")
+        .delete()
+        .eq("id", mealId)
+
+      if (deleteMealError) throw deleteMealError
+
+      await getData()
+    } catch (error) {
+      console.error("Failed to delete meal:", error)
+    } finally {
+      setDeletingMealId(null)
+    }
+  }
+
+  const confirmDeleteMeal = (mealId: string) => {
+    Alert.alert("刪除餐點", "刪除後將無法復原，確定要刪除嗎？", [
+      { text: "取消", style: "cancel" },
+      {
+        text: "刪除",
+        style: "destructive",
+        onPress: () => {
+          void onDeleteMeal(mealId)
+        },
+      },
+    ])
   }
 
   const getData = useCallback(async () => {
@@ -134,11 +191,28 @@ export default function HomeScreen() {
             key={meal.id}
             className="overflow-hidden rounded-3xl border border-slate-200 bg-white"
           >
-            <ImageViewer
-              imgSource={meal.img_url}
-              selectedImage={meal.img_url}
-              className="h-56 w-full"
-            />
+            <View className="relative">
+              <ImageViewer
+                imgSource={meal.img_url}
+                selectedImage={meal.img_url}
+                className="h-56 w-full"
+              />
+              <View className="absolute right-3 top-3 flex-row gap-2">
+                <Pressable
+                  onPress={() => onEditMeal(meal)}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white/90"
+                >
+                  <Feather name="edit-2" size={16} color="#334155" />
+                </Pressable>
+                <Pressable
+                  disabled={deletingMealId === meal.id}
+                  onPress={() => confirmDeleteMeal(meal.id)}
+                  className="h-9 w-9 items-center justify-center rounded-full bg-white/90"
+                >
+                  <Feather name="trash-2" size={16} color="#dc2626" />
+                </Pressable>
+              </View>
+            </View>
 
             <View className="gap-3 px-4 py-4">
               <View className="flex-row items-center justify-between">

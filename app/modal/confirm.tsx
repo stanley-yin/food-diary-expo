@@ -95,30 +95,43 @@ export default function ConfirmModalScreen() {
       if (mealError) throw mealError
 
       // 使用 state 中的 tags
-      const tagNames = tags
+      const tagNames = [...new Set(tags.map((tag) => tag.trim()))].filter(Boolean)
       if (tagNames.length > 0) {
-        // 2. 批量處理標籤 (使用 upsert：若名稱重複則不新增，直接回傳)
-        const tagObjects = tagNames.map((name) => ({ name }))
-        const { data: tagsData, error: tagError } = await supabase
+        const { data: existingTags, error: existingTagsError } = await supabase
           .from("food_tags")
-          .upsert(tagObjects, { onConflict: "name" }) // 根據 name 判斷是否重複
-          .select()
+          .select("id, name")
+          .in("name", tagNames)
 
-        if (tagError) {
-          console.error("Error upserting tags:", tagError)
-          // 決定是否要中斷流程
-        } else if (tagsData) {
-          // 3. 建立關聯到橋接表 meal_food_tags
-          const junctionData = tagsData.map((tag) => ({
-            meal_id: meal[0].id,
-            tag_id: tag.id,
-          }))
+        if (existingTagsError) throw existingTagsError
 
+        const existingTagMap = new Map(
+          (existingTags || []).map((item) => [item.name, item.id]),
+        )
+        const missingTagNames = tagNames.filter((name) => !existingTagMap.has(name))
+
+        if (missingTagNames.length > 0) {
+          const { data: insertedTags, error: insertTagsError } = await supabase
+            .from("food_tags")
+            .insert(missingTagNames.map((name) => ({ name })))
+            .select("id, name")
+
+          if (insertTagsError) throw insertTagsError
+
+          for (const item of insertedTags || []) {
+            existingTagMap.set(item.name, item.id)
+          }
+        }
+
+        const tagIds = tagNames
+          .map((name) => existingTagMap.get(name))
+          .filter((id): id is string => Boolean(id))
+
+        if (tagIds.length > 0) {
           const { error: linkError } = await supabase
             .from("meal_food_tags")
-            .insert(junctionData)
+            .insert(tagIds.map((tagId) => ({ meal_id: meal[0].id, tag_id: tagId })))
 
-          if (linkError) console.error("Error linking tags:", linkError)
+          if (linkError) throw linkError
         }
       }
 

@@ -33,6 +33,12 @@ function RootNavigator() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="modal/edit-meal"
+        options={{
+          presentation: "modal",
+        }}
+      />
     </Stack>
   )
 }
