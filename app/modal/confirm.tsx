@@ -1,4 +1,11 @@
-import { Text, TextInput, View } from "react-native"
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import ImageViewer from "@/components/imageViewer"
 import * as FileSystem from "expo-file-system/legacy"
@@ -9,6 +16,13 @@ import { Controller, useForm } from "react-hook-form"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
 import TagInput from "@/components/TagInput"
+
+const parseExifDate = (rawDate?: string | string[]) => {
+  const normalized = Array.isArray(rawDate) ? rawDate[0] : rawDate
+  if (!normalized) return new Date()
+  const parsed = new Date(normalized.replace(/:/, "-").replace(/:/, "-"))
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed
+}
 
 export default function ConfirmModalScreen() {
   const router = useRouter()
@@ -22,7 +36,7 @@ export default function ConfirmModalScreen() {
   const { control, handleSubmit } = useForm({
     defaultValues: {
       name: "",
-      datetime: new Date(date.replace(/:/, "-").replace(/:/, "-")), // EXIF 不是標準 ISO 格式
+      datetime: parseExifDate(date), // EXIF 不是標準 ISO 格式
     },
   })
 
@@ -103,45 +117,88 @@ export default function ConfirmModalScreen() {
   }
 
   return (
-    <View className="mx-auto py-10 w-full px-4">
-      <View>
-        <ImageViewer imgSource={imgUri} selectedImage={imgUri} />
-        <View>
-          <TagInput tags={tags} setTags={setTags} label="食物標籤：" />
+    <KeyboardAvoidingView
+      className="flex-1 bg-slate-50"
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerClassName="mx-auto w-full max-w-xl px-4 pb-10 pt-8"
+        keyboardShouldPersistTaps="handled"
+      >
+        <View className="mb-6">
+          <Text className="text-2xl font-bold text-slate-900">確認這餐內容</Text>
+          <Text className="mt-1 text-sm text-slate-500">
+            調整名稱、時間與標籤後即可上傳
+          </Text>
+        </View>
+
+        <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+          <ImageViewer
+            imgSource={typeof imgUri === "string" ? imgUri : ""}
+            selectedImage={typeof imgUri === "string" ? imgUri : ""}
+            className="h-72 w-full"
+          />
+        </View>
+
+        <View className="mt-5 gap-5 rounded-3xl border border-slate-200 bg-white p-5">
           <Controller
             control={control}
-            name="datetime"
+            name="name"
             render={({ field: { onChange, value } }) => (
-              <View className="flex-row items-center py-4">
-                <Text className="h3">用餐時間：</Text>
-                <DateTimePicker
+              <View className="gap-2">
+                <Text className="h3">餐點名稱</Text>
+                <TextInput
                   value={value}
-                  mode="datetime"
-                  display="default"
-                  onChange={(event, selectedDate) => {
-                    if (selectedDate) onChange(selectedDate) // 更新 RHF value
-                  }}
+                  onChangeText={onChange}
+                  placeholder="例如：訓練後晚餐"
+                  placeholderTextColor="#94a3b8"
+                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800"
                 />
               </View>
             )}
           />
+
+          <TagInput tags={tags} setTags={setTags} label="食物標籤" />
+
+          <Controller
+            control={control}
+            name="datetime"
+            render={({ field: { onChange, value } }) => (
+              <View className="gap-2">
+                <Text className="h3">用餐時間</Text>
+                <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
+                  <DateTimePicker
+                    value={value}
+                    mode="datetime"
+                    display="default"
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) onChange(selectedDate)
+                    }}
+                  />
+                </View>
+              </View>
+            )}
+          />
         </View>
-        <View className="flex mt-10 flex-row justify-between">
+
+        <View className="mt-8 flex-row gap-3">
           <ThemeButton
-            size={"lg"}
+            size={"md"}
             variant={"ghost"}
             title="重新選擇"
+            className="flex-1 border border-slate-200 bg-white"
             disabled={isLoading}
             onPress={() => router.back()}
           />
           <ThemeButton
-            size={"lg"}
-            title="上傳"
+            size={"md"}
+            title={isLoading ? "上傳中..." : "上傳餐點"}
+            className="flex-1"
             disabled={isLoading}
             onPress={handleSubmit(uploadImage)}
           />
         </View>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   )
 }
