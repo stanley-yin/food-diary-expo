@@ -94,16 +94,17 @@ export default function GoogleSignInButton() {
         alignItems: 'center',
         backgroundColor: '#ffffff',
         borderWidth: 1,
-        borderColor: '#dbdbdb',
-        borderRadius: 4,
-        paddingVertical: 10,
-        paddingHorizontal: 15,
+        borderColor: '#e2e8f0',
+        borderRadius: 18,
+        paddingVertical: 14,
+        paddingHorizontal: 18,
         justifyContent: 'center',
+        width: '100%',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2, // For Android shadow
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
       }}
       activeOpacity={0.8}
     >
@@ -114,12 +115,11 @@ export default function GoogleSignInButton() {
       <Text
         style={{
           fontSize: 16,
-          color: '#757575',
-          fontFamily: 'Roboto-Regular', // Assuming Roboto is available; install via expo-google-fonts or similar if needed
-          fontWeight: '500',
+          color: '#0f172a',
+          fontWeight: '600',
         }}
       >
-        Sign in with Google
+        使用 Google 登入
       </Text>
     </TouchableOpacity>
   );
