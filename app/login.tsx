@@ -2,7 +2,6 @@ import { Stack } from "expo-router"
 import { Text, View } from "react-native"
 import GoogleSignInButton from "@/components/social-auth-buttons/google/google-sign-in-button"
 import { SafeAreaView } from "react-native-safe-area-context"
-import Feather from "@expo/vector-icons/Feather"
 import { Image } from "expo-image"
 
 const HERO_MEAL_IMAGE =
@@ -20,7 +19,6 @@ export default function LoginScreen() {
                 <Text className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">
                   Food Diary
                 </Text>
-                
                 <Text className="text-center text-4xl font-bold leading-tight text-slate-900">
                   用照片記下
                   {"\n"}

@@ -76,40 +76,41 @@ function MealDraftCard({
 
   return (
     <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-      <Pressable onPress={onToggle} className="px-4 pb-4 pt-4">
-        <View className="flex-row items-start gap-3">
+      <Pressable onPress={onToggle}>
+        <View className="relative">
           <ImageViewer
             imgSource={draft.imgUri}
             selectedImage={draft.imgUri}
-            className="h-20 w-20 overflow-hidden rounded-2xl"
+            className="h-52 w-full"
           />
-          <View className="flex-1 gap-2">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-base font-semibold text-slate-900">
-                第 {index + 1} 筆餐點
-              </Text>
-              <View className="flex-row items-center gap-2">
-                {isSuccess && (
-                  <View className="rounded-full bg-emerald-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-emerald-700">
-                      已完成
-                    </Text>
-                  </View>
-                )}
-                {draft.status === "error" && (
-                  <View className="rounded-full bg-red-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-red-700">失敗</Text>
-                  </View>
-                )}
-                {isUploading && (
-                  <View className="rounded-full bg-blue-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-blue-700">
-                      上傳中
-                    </Text>
-                  </View>
-                )}
+          <View className="absolute right-4 top-4 flex-row items-center gap-2">
+            {isSuccess && (
+              <View className="rounded-full bg-emerald-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-emerald-700">
+                  已完成
+                </Text>
               </View>
-            </View>
+            )}
+            {draft.status === "error" && (
+              <View className="rounded-full bg-red-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-red-700">失敗</Text>
+              </View>
+            )}
+            {isUploading && (
+              <View className="rounded-full bg-blue-100 px-3 py-1">
+                <Text className="text-xs font-semibold text-blue-700">
+                  上傳中
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View className="gap-2 px-4 pb-4 pt-4">
+          <View className="flex-row items-start justify-between gap-3">
+            <Text className="flex-1 text-base font-semibold text-slate-900">
+              第 {index + 1} 筆餐點
+            </Text>
             <View
               className="self-start rounded-full px-3 py-1"
               style={{
@@ -123,13 +124,13 @@ function MealDraftCard({
                 {MEAL_LABEL_MAP[draft.label]}
               </Text>
             </View>
-            <Text className="text-sm text-slate-400">
-              {draft.datetime.toLocaleString()}
-            </Text>
-            {draft.errorMessage ? (
-              <Text className="text-sm text-red-500">{draft.errorMessage}</Text>
-            ) : null}
           </View>
+          <Text className="text-sm text-slate-400">
+            {draft.datetime.toLocaleString()}
+          </Text>
+          {draft.errorMessage ? (
+            <Text className="text-sm text-red-500">{draft.errorMessage}</Text>
+          ) : null}
         </View>
       </Pressable>
 
