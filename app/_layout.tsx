@@ -31,12 +31,14 @@ function RootNavigator() {
         name="modal/confirm"
         options={{
           presentation: "modal",
+          title: "新增餐點",
         }}
       />
       <Stack.Screen
         name="modal/edit-meal"
         options={{
           presentation: "modal",
+          title: "編輯餐點",
         }}
       />
     </Stack>
