@@ -17,7 +17,11 @@ import { useCallback, useState } from "react"
 import ImageViewer from "@/components/imageViewer"
 import dayjs from "dayjs"
 import { useFocusEffect } from "@react-navigation/native"
-import { MEAL_LABEL_MAP, type MealLabelKey } from "@/constants/meal-label"
+import {
+  MEAL_LABEL_BADGE_STYLES,
+  MEAL_LABEL_MAP,
+  type MealLabelKey,
+} from "@/constants/meal-label"
 
 type mealItem = {
   datetime: string
@@ -220,8 +224,19 @@ export default function HomeScreen() {
             <View className="gap-3 px-4 py-4">
               <View className="flex-row items-center justify-between">
                 {!!meal.label ? (
-                  <View className="rounded-full bg-amber-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-amber-700">
+                  <View
+                    className="rounded-full px-3 py-1"
+                    style={{
+                      backgroundColor:
+                        MEAL_LABEL_BADGE_STYLES[meal.label].backgroundColor,
+                    }}
+                  >
+                    <Text
+                      className="text-xs font-semibold"
+                      style={{
+                        color: MEAL_LABEL_BADGE_STYLES[meal.label].textColor,
+                      }}
+                    >
                       {MEAL_LABEL_MAP[meal.label]}
                     </Text>
                   </View>

@@ -18,6 +18,7 @@ import ThemeButton from "@/components/Button"
 import TagInput from "@/components/TagInput"
 import SuggestedTags from "@/components/SuggestedTags"
 import {
+  MEAL_LABEL_BADGE_STYLES,
   MEAL_LABEL_MAP,
   MEAL_LABEL_OPTIONS,
   type MealLabelKey,
@@ -109,7 +110,19 @@ function MealDraftCard({
                 )}
               </View>
             </View>
-            <Text className="text-sm text-slate-500">{MEAL_LABEL_MAP[draft.label]}</Text>
+            <View
+              className="self-start rounded-full px-3 py-1"
+              style={{
+                backgroundColor: MEAL_LABEL_BADGE_STYLES[draft.label].backgroundColor,
+              }}
+            >
+              <Text
+                className="text-xs font-semibold"
+                style={{ color: MEAL_LABEL_BADGE_STYLES[draft.label].textColor }}
+              >
+                {MEAL_LABEL_MAP[draft.label]}
+              </Text>
+            </View>
             <Text className="text-sm text-slate-400">
               {draft.datetime.toLocaleString()}
             </Text>
