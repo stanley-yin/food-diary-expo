@@ -1,4 +1,5 @@
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,8 +12,7 @@ import ImageViewer from "@/components/imageViewer"
 import * as FileSystem from "expo-file-system/legacy"
 import { decode } from "base64-arraybuffer"
 import { supabase } from "@/lib/supabase.web"
-import { useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { useEffect, useMemo, useState } from "react"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
 import TagInput from "@/components/TagInput"
@@ -29,114 +29,209 @@ const parseExifDate = (rawDate?: string | string[]) => {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed
 }
 
+type MealDraftParam = {
+  uri?: string
+  date?: string
+  fileName?: string | null
+  mimeType?: string | null
+}
+
+type MealDraft = {
+  id: string
+  imgUri: string
+  fileName?: string | null
+  mimeType?: string | null
+  datetime: Date
+  label: MealLabelKey
+  tags: string[]
+  status: "idle" | "uploading" | "success" | "error"
+  errorMessage?: string
+}
+
 export default function ConfirmModalScreen() {
   const router = useRouter()
   const params = useLocalSearchParams()
-  const [isLoading, setIsLoading] = useState<boolean>(false)
-  const [tags, setTags] = useState<string[]>([])
-  const { imgUri, date, mimeType, fileName } = Array.isArray(params)
-    ? params[0]
-    : params
+  const [drafts, setDrafts] = useState<MealDraft[]>([])
+  const [expandedDraftId, setExpandedDraftId] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const { control, handleSubmit } = useForm<{
-    label: MealLabelKey
-    datetime: Date
-  }>({
-    defaultValues: {
-      label: "breakfast",
-      datetime: parseExifDate(date), // EXIF 不是標準 ISO 格式
-    },
-  })
+  const draftParams = useMemo(() => {
+    const rawDrafts = params.drafts
+    const value = Array.isArray(rawDrafts) ? rawDrafts[0] : rawDrafts
 
-  const uploadImage = async (data: {
-    datetime: Date
-    label: MealLabelKey
-  }) => {
-    if (!imgUri) return
-    setIsLoading(true)
+    if (!value) return []
+
+    try {
+      const parsed = JSON.parse(value) as MealDraftParam[]
+      return Array.isArray(parsed) ? parsed : []
+    } catch (error) {
+      console.error("Failed to parse meal drafts:", error)
+      return []
+    }
+  }, [params.drafts])
+
+  useEffect(() => {
+    const nextDrafts = draftParams
+      .filter((item) => !!item.uri)
+      .map((item, index) => ({
+        id: `${Date.now()}-${index}`,
+        imgUri: item.uri || "",
+        fileName: item.fileName,
+        mimeType: item.mimeType,
+        datetime: parseExifDate(item.date),
+        label: "breakfast" as MealLabelKey,
+        tags: [],
+        status: "idle" as const,
+      }))
+
+    setDrafts(nextDrafts)
+    setExpandedDraftId(nextDrafts[0]?.id ?? null)
+  }, [draftParams])
+
+  const pendingCount = drafts.filter((draft) => draft.status !== "success").length
+
+  const updateDraft = (
+    draftId: string,
+    updater: (draft: MealDraft) => MealDraft,
+  ) => {
+    setDrafts((current) =>
+      current.map((draft) => (draft.id === draftId ? updater(draft) : draft)),
+    )
+  }
+
+  const removeDraft = (draftId: string) => {
+    setDrafts((current) => {
+      const nextDrafts = current.filter((draft) => draft.id !== draftId)
+      if (expandedDraftId === draftId) {
+        setExpandedDraftId(nextDrafts[0]?.id ?? null)
+      }
+      return nextDrafts
+    })
+  }
+
+  const upsertTags = async (tagNames: string[]) => {
+    const normalizedTagNames = [...new Set(tagNames.map((tag) => tag.trim()))].filter(
+      Boolean,
+    )
+    if (normalizedTagNames.length === 0) return []
+
+    const { data: existingTags, error: existingTagsError } = await supabase
+      .from("food_tags")
+      .select("id, name")
+      .in("name", normalizedTagNames)
+
+    if (existingTagsError) throw existingTagsError
+
+    const existingTagMap = new Map(
+      (existingTags || []).map((item) => [item.name, item.id]),
+    )
+    const missingTagNames = normalizedTagNames.filter(
+      (name) => !existingTagMap.has(name),
+    )
+
+    if (missingTagNames.length > 0) {
+      const { data: insertedTags, error: insertTagsError } = await supabase
+        .from("food_tags")
+        .insert(missingTagNames.map((name) => ({ name })))
+        .select("id, name")
+
+      if (insertTagsError) throw insertTagsError
+
+      for (const item of insertedTags || []) {
+        existingTagMap.set(item.name, item.id)
+      }
+    }
+
+    return normalizedTagNames
+      .map((name) => existingTagMap.get(name))
+      .filter((id): id is string => Boolean(id))
+  }
+
+  const uploadDraft = async (draft: MealDraft, userId?: string) => {
+    const b64 = await FileSystem.readAsStringAsync(draft.imgUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    })
+    const arrayBuffer = decode(b64)
+    const filePath = `${Date.now()}_${draft.fileName ?? "upload.jpg"}`
+
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, arrayBuffer, {
+        contentType: draft.mimeType || "image/jpeg",
+        upsert: true,
+      })
+
+    if (storageError) throw storageError
+
+    const { data: meal, error: mealError } = await supabase
+      .from("meals")
+      .insert({
+        datetime: draft.datetime.toISOString(),
+        label: draft.label,
+        user_id: userId,
+        img_url: storageData.path,
+      })
+      .select("id")
+      .single()
+
+    if (mealError) throw mealError
+
+    const tagIds = await upsertTags(draft.tags)
+    if (tagIds.length === 0) return
+
+    const { error: linkError } = await supabase
+      .from("meal_food_tags")
+      .insert(tagIds.map((tagId) => ({ meal_id: meal.id, tag_id: tagId })))
+
+    if (linkError) throw linkError
+  }
+
+  const handleSubmitAll = async () => {
+    const draftsToUpload = drafts.filter((draft) => draft.status !== "success")
+    if (draftsToUpload.length === 0) return
+
+    setIsSubmitting(true)
 
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
 
-      // 1. 處理檔案轉換，supabase 需要用 base64
-      const b64 = await FileSystem.readAsStringAsync(imgUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      })
-      const arrayBuffer = decode(b64)
-      const filePath = `${Date.now()}_${fileName ?? "upload.jpg"}`
+      let failedCount = 0
 
-      // 2. 上傳圖片
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, arrayBuffer, {
-          contentType: mimeType,
-          upsert: true,
-        })
+      for (const draft of draftsToUpload) {
+        updateDraft(draft.id, (current) => ({
+          ...current,
+          status: "uploading",
+          errorMessage: undefined,
+        }))
 
-      if (storageError) throw storageError
-
-      const { data: meal, error: mealError } = await supabase
-        .from("meals")
-        .insert({
-          datetime: data.datetime.toISOString(),
-          label: data.label,
-          user_id: user?.id,
-          img_url: storageData.path, // 使用上傳成功的路徑
-        })
-        .select()
-
-      if (mealError) throw mealError
-
-      // 使用 state 中的 tags
-      const tagNames = [...new Set(tags.map((tag) => tag.trim()))].filter(Boolean)
-      if (tagNames.length > 0) {
-        const { data: existingTags, error: existingTagsError } = await supabase
-          .from("food_tags")
-          .select("id, name")
-          .in("name", tagNames)
-
-        if (existingTagsError) throw existingTagsError
-
-        const existingTagMap = new Map(
-          (existingTags || []).map((item) => [item.name, item.id]),
-        )
-        const missingTagNames = tagNames.filter((name) => !existingTagMap.has(name))
-
-        if (missingTagNames.length > 0) {
-          const { data: insertedTags, error: insertTagsError } = await supabase
-            .from("food_tags")
-            .insert(missingTagNames.map((name) => ({ name })))
-            .select("id, name")
-
-          if (insertTagsError) throw insertTagsError
-
-          for (const item of insertedTags || []) {
-            existingTagMap.set(item.name, item.id)
-          }
-        }
-
-        const tagIds = tagNames
-          .map((name) => existingTagMap.get(name))
-          .filter((id): id is string => Boolean(id))
-
-        if (tagIds.length > 0) {
-          const { error: linkError } = await supabase
-            .from("meal_food_tags")
-            .insert(tagIds.map((tagId) => ({ meal_id: meal[0].id, tag_id: tagId })))
-
-          if (linkError) throw linkError
+        try {
+          await uploadDraft(draft, user?.id)
+          updateDraft(draft.id, (current) => ({
+            ...current,
+            status: "success",
+            errorMessage: undefined,
+          }))
+        } catch (error) {
+          failedCount += 1
+          console.error("Failed to upload meal draft:", error)
+          updateDraft(draft.id, (current) => ({
+            ...current,
+            status: "error",
+            errorMessage: "上傳失敗，請再試一次",
+          }))
         }
       }
 
-      console.log("upload success")
-      router.back()
-    } catch (e) {
-      console.error("Operation failed:", e)
+      if (failedCount === 0) {
+        router.back()
+        return
+      }
+
+      Alert.alert("部分餐點未新增", "失敗的照片已保留在頁面上，可直接再次送出。")
     } finally {
-      // 無論成功或失敗，最後統一關閉 Loading
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -150,94 +245,188 @@ export default function ConfirmModalScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View className="mb-6">
-          <Text className="text-2xl font-bold text-slate-900">確認這餐內容</Text>
-          <Text className="mt-1 text-sm text-slate-500">調整時間與標籤後即可上傳</Text>
+          <Text className="text-2xl font-bold text-slate-900">確認餐點內容</Text>
+          <Text className="mt-1 text-sm text-slate-500">
+            已選擇 {drafts.length} 張照片，每張照片會建立一筆餐點
+          </Text>
         </View>
 
-        <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-          <ImageViewer
-            imgSource={typeof imgUri === "string" ? imgUri : ""}
-            selectedImage={typeof imgUri === "string" ? imgUri : ""}
-            className="h-72 w-full"
-          />
-        </View>
+        <View className="gap-4">
+          {drafts.map((draft, index) => {
+            const isExpanded = expandedDraftId === draft.id
+            const isSuccess = draft.status === "success"
+            const isUploading = draft.status === "uploading"
 
-        <View className="mt-5 gap-5 rounded-3xl border border-slate-200 bg-white p-5">
-          <Controller
-            control={control}
-            name="label"
-            render={({ field: { onChange, value } }) => (
-              <View className="gap-2">
-                <Text className="h3">餐別</Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {MEAL_LABEL_OPTIONS.map((option) => {
-                    const isActive = value === option.value
-                    return (
-                      <Pressable
-                        key={option.value}
-                        onPress={() => onChange(option.value)}
-                        className={`rounded-full border px-4 py-2 ${
-                          isActive
-                            ? "border-blue-600 bg-blue-600"
-                            : "border-slate-200 bg-slate-50"
-                        }`}
-                      >
-                        <Text
-                          className={`text-sm font-semibold ${
-                            isActive ? "text-white" : "text-slate-600"
-                          }`}
-                        >
-                          {option.label}
-                        </Text>
-                      </Pressable>
+            return (
+              <View
+                key={draft.id}
+                className="overflow-hidden rounded-3xl border border-slate-200 bg-white"
+              >
+                <Pressable
+                  onPress={() =>
+                    setExpandedDraftId((current) =>
+                      current === draft.id ? null : draft.id,
                     )
-                  })}
-                </View>
-                <Text className="text-xs text-slate-400">
-                  目前選擇：{MEAL_LABEL_MAP[value]}
-                </Text>
-              </View>
-            )}
-          />
+                  }
+                  className="px-4 pb-4 pt-4"
+                >
+                  <View className="flex-row items-start gap-3">
+                    <ImageViewer
+                      imgSource={draft.imgUri}
+                      selectedImage={draft.imgUri}
+                      className="h-20 w-20 overflow-hidden rounded-2xl"
+                    />
+                    <View className="flex-1 gap-2">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-base font-semibold text-slate-900">
+                          第 {index + 1} 筆餐點
+                        </Text>
+                        <View className="flex-row items-center gap-2">
+                          {isSuccess && (
+                            <View className="rounded-full bg-emerald-100 px-3 py-1">
+                              <Text className="text-xs font-semibold text-emerald-700">
+                                已完成
+                              </Text>
+                            </View>
+                          )}
+                          {draft.status === "error" && (
+                            <View className="rounded-full bg-red-100 px-3 py-1">
+                              <Text className="text-xs font-semibold text-red-700">
+                                失敗
+                              </Text>
+                            </View>
+                          )}
+                          {isUploading && (
+                            <View className="rounded-full bg-blue-100 px-3 py-1">
+                              <Text className="text-xs font-semibold text-blue-700">
+                                上傳中
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                      <Text className="text-sm text-slate-500">
+                        {MEAL_LABEL_MAP[draft.label]}
+                      </Text>
+                      <Text className="text-sm text-slate-400">
+                        {draft.datetime.toLocaleString()}
+                      </Text>
+                      {draft.errorMessage ? (
+                        <Text className="text-sm text-red-500">
+                          {draft.errorMessage}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
 
-          <TagInput tags={tags} setTags={setTags} label="食物標籤" />
+                {isExpanded && (
+                  <View className="gap-5 border-t border-slate-100 px-4 py-5">
+                    <View className="gap-2">
+                      <Text className="h3">餐別</Text>
+                      <View className="flex-row flex-wrap gap-2">
+                        {MEAL_LABEL_OPTIONS.map((option) => {
+                          const isActive = draft.label === option.value
+                          return (
+                            <Pressable
+                              key={option.value}
+                              onPress={() =>
+                                updateDraft(draft.id, (current) => ({
+                                  ...current,
+                                  label: option.value,
+                                  status:
+                                    current.status === "error" ? "idle" : current.status,
+                                  errorMessage: undefined,
+                                }))
+                              }
+                              className={`rounded-full border px-4 py-2 ${
+                                isActive
+                                  ? "border-blue-600 bg-blue-600"
+                                  : "border-slate-200 bg-slate-50"
+                              }`}
+                            >
+                              <Text
+                                className={`text-sm font-semibold ${
+                                  isActive ? "text-white" : "text-slate-600"
+                                }`}
+                              >
+                                {option.label}
+                              </Text>
+                            </Pressable>
+                          )
+                        })}
+                      </View>
+                      <Text className="text-xs text-slate-400">
+                        目前選擇：{MEAL_LABEL_MAP[draft.label]}
+                      </Text>
+                    </View>
 
-          <Controller
-            control={control}
-            name="datetime"
-            render={({ field: { onChange, value } }) => (
-              <View className="gap-2">
-                <Text className="h3">用餐時間</Text>
-                <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
-                  <DateTimePicker
-                    value={value}
-                    mode="datetime"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                      if (selectedDate) onChange(selectedDate)
-                    }}
-                  />
-                </View>
+                    <TagInput
+                      tags={draft.tags}
+                      setTags={(nextTags) =>
+                        updateDraft(draft.id, (current) => ({
+                          ...current,
+                          tags: nextTags,
+                          status: current.status === "error" ? "idle" : current.status,
+                          errorMessage: undefined,
+                        }))
+                      }
+                      label="食物標籤"
+                    />
+
+                    <View className="gap-2">
+                      <Text className="h3">用餐時間</Text>
+                      <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
+                        <DateTimePicker
+                          value={draft.datetime}
+                          mode="datetime"
+                          display="default"
+                          onChange={(event, selectedDate) => {
+                            if (!selectedDate) return
+                            updateDraft(draft.id, (current) => ({
+                              ...current,
+                              datetime: selectedDate,
+                              status:
+                                current.status === "error" ? "idle" : current.status,
+                              errorMessage: undefined,
+                            }))
+                          }}
+                        />
+                      </View>
+                    </View>
+
+                    {!isSuccess && (
+                      <ThemeButton
+                        size={"md"}
+                        variant={"ghost"}
+                        title="移除這張照片"
+                        className="border border-red-200 bg-red-50"
+                        disabled={isSubmitting}
+                        onPress={() => removeDraft(draft.id)}
+                      />
+                    )}
+                  </View>
+                )}
               </View>
-            )}
-          />
+            )
+          })}
         </View>
 
         <View className="mt-8 flex-row gap-3">
           <ThemeButton
             size={"md"}
             variant={"ghost"}
-            title="重新選擇"
+            title="取消"
             className="flex-1 border border-slate-200 bg-white"
-            disabled={isLoading}
+            disabled={isSubmitting}
             onPress={() => router.back()}
           />
           <ThemeButton
             size={"md"}
-            title={isLoading ? "上傳中..." : "上傳餐點"}
-            className="flex-1"
-            disabled={isLoading}
-            onPress={handleSubmit(uploadImage)}
+            title={isSubmitting ? "新增中..." : `新增 ${pendingCount} 筆餐點`}
+            className={`flex-1 ${pendingCount === 0 ? "bg-slate-400" : ""}`}
+            disabled={isSubmitting || pendingCount === 0}
+            onPress={handleSubmitAll}
           />
         </View>
       </ScrollView>
