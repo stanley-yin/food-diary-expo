@@ -37,18 +37,23 @@ export default function HomeScreen() {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       exif: true, // 讀取圖片細節 metadata
+      allowsMultipleSelection: true,
+      selectionLimit: 0,
     }
 
     const result = await ImagePicker.launchImageLibraryAsync(options)
     if (!result.canceled) {
-      const { uri, exif, fileName, mimeType } = result.assets[0]
+      const draftPayload = result.assets.map((asset) => ({
+        uri: asset.uri,
+        date: asset.exif?.DateTimeOriginal,
+        fileName: asset.fileName,
+        mimeType: asset.mimeType,
+      }))
+
       router.push({
         pathname: "/modal/confirm",
         params: {
-          imgUri: uri,
-          date: exif?.DateTimeOriginal,
-          fileName: fileName,
-          mimeType: mimeType,
+          drafts: JSON.stringify(draftPayload),
         },
       })
     }
