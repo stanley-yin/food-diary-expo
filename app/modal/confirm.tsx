@@ -16,11 +16,13 @@ import { useEffect, useMemo, useState } from "react"
 import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
 import TagInput from "@/components/TagInput"
+import SuggestedTags from "@/components/SuggestedTags"
 import {
   MEAL_LABEL_MAP,
   MEAL_LABEL_OPTIONS,
   type MealLabelKey,
 } from "@/constants/meal-label"
+import { useSuggestedMealTags } from "@/hooks/use-suggested-meal-tags"
 
 const parseExifDate = (rawDate?: string | string[]) => {
   const normalized = Array.isArray(rawDate) ? rawDate[0] : rawDate
@@ -46,6 +48,180 @@ type MealDraft = {
   tags: string[]
   status: "idle" | "uploading" | "success" | "error"
   errorMessage?: string
+}
+
+type MealDraftCardProps = {
+  draft: MealDraft
+  index: number
+  isExpanded: boolean
+  isSubmitting: boolean
+  onToggle: () => void
+  onUpdate: (updater: (draft: MealDraft) => MealDraft) => void
+  onRemove: () => void
+}
+
+function MealDraftCard({
+  draft,
+  index,
+  isExpanded,
+  isSubmitting,
+  onToggle,
+  onUpdate,
+  onRemove,
+}: MealDraftCardProps) {
+  const isSuccess = draft.status === "success"
+  const isUploading = draft.status === "uploading"
+  const { suggestions, isLoading } = useSuggestedMealTags(draft.label, draft.tags)
+
+  return (
+    <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+      <Pressable onPress={onToggle} className="px-4 pb-4 pt-4">
+        <View className="flex-row items-start gap-3">
+          <ImageViewer
+            imgSource={draft.imgUri}
+            selectedImage={draft.imgUri}
+            className="h-20 w-20 overflow-hidden rounded-2xl"
+          />
+          <View className="flex-1 gap-2">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-base font-semibold text-slate-900">
+                第 {index + 1} 筆餐點
+              </Text>
+              <View className="flex-row items-center gap-2">
+                {isSuccess && (
+                  <View className="rounded-full bg-emerald-100 px-3 py-1">
+                    <Text className="text-xs font-semibold text-emerald-700">
+                      已完成
+                    </Text>
+                  </View>
+                )}
+                {draft.status === "error" && (
+                  <View className="rounded-full bg-red-100 px-3 py-1">
+                    <Text className="text-xs font-semibold text-red-700">失敗</Text>
+                  </View>
+                )}
+                {isUploading && (
+                  <View className="rounded-full bg-blue-100 px-3 py-1">
+                    <Text className="text-xs font-semibold text-blue-700">
+                      上傳中
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <Text className="text-sm text-slate-500">{MEAL_LABEL_MAP[draft.label]}</Text>
+            <Text className="text-sm text-slate-400">
+              {draft.datetime.toLocaleString()}
+            </Text>
+            {draft.errorMessage ? (
+              <Text className="text-sm text-red-500">{draft.errorMessage}</Text>
+            ) : null}
+          </View>
+        </View>
+      </Pressable>
+
+      {isExpanded && (
+        <View className="gap-5 border-t border-slate-100 px-4 py-5">
+          <View className="gap-2">
+            <Text className="h3">餐別</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {MEAL_LABEL_OPTIONS.map((option) => {
+                const isActive = draft.label === option.value
+                return (
+                  <Pressable
+                    key={option.value}
+                    onPress={() =>
+                      onUpdate((current) => ({
+                        ...current,
+                        label: option.value,
+                        status: current.status === "error" ? "idle" : current.status,
+                        errorMessage: undefined,
+                      }))
+                    }
+                    className={`rounded-full border px-4 py-2 ${
+                      isActive
+                        ? "border-blue-600 bg-blue-600"
+                        : "border-slate-200 bg-slate-50"
+                    }`}
+                  >
+                    <Text
+                      className={`text-sm font-semibold ${
+                        isActive ? "text-white" : "text-slate-600"
+                      }`}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+            <Text className="text-xs text-slate-400">
+              目前選擇：{MEAL_LABEL_MAP[draft.label]}
+            </Text>
+          </View>
+
+          <SuggestedTags
+            suggestions={suggestions}
+            selectedTags={draft.tags}
+            isLoading={isLoading}
+            onSelectTag={(tag) => {
+              if (draft.tags.includes(tag)) return
+              onUpdate((current) => ({
+                ...current,
+                tags: [...current.tags, tag],
+                status: current.status === "error" ? "idle" : current.status,
+                errorMessage: undefined,
+              }))
+            }}
+          />
+
+          <TagInput
+            tags={draft.tags}
+            setTags={(nextTags) =>
+              onUpdate((current) => ({
+                ...current,
+                tags: nextTags,
+                status: current.status === "error" ? "idle" : current.status,
+                errorMessage: undefined,
+              }))
+            }
+            label="食物標籤"
+          />
+
+          <View className="gap-2">
+            <Text className="h3">用餐時間</Text>
+            <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
+              <DateTimePicker
+                value={draft.datetime}
+                mode="datetime"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  if (!selectedDate) return
+                  onUpdate((current) => ({
+                    ...current,
+                    datetime: selectedDate,
+                    status: current.status === "error" ? "idle" : current.status,
+                    errorMessage: undefined,
+                  }))
+                }}
+              />
+            </View>
+          </View>
+
+          {!isSuccess && (
+            <ThemeButton
+              size={"md"}
+              variant={"ghost"}
+              title="移除這張照片"
+              className="border border-red-200 bg-red-50"
+              disabled={isSubmitting}
+              onPress={onRemove}
+            />
+          )}
+        </View>
+      )}
+    </View>
+  )
 }
 
 export default function ConfirmModalScreen() {
@@ -252,164 +428,22 @@ export default function ConfirmModalScreen() {
         </View>
 
         <View className="gap-4">
-          {drafts.map((draft, index) => {
-            const isExpanded = expandedDraftId === draft.id
-            const isSuccess = draft.status === "success"
-            const isUploading = draft.status === "uploading"
-
-            return (
-              <View
-                key={draft.id}
-                className="overflow-hidden rounded-3xl border border-slate-200 bg-white"
-              >
-                <Pressable
-                  onPress={() =>
-                    setExpandedDraftId((current) =>
-                      current === draft.id ? null : draft.id,
-                    )
-                  }
-                  className="px-4 pb-4 pt-4"
-                >
-                  <View className="flex-row items-start gap-3">
-                    <ImageViewer
-                      imgSource={draft.imgUri}
-                      selectedImage={draft.imgUri}
-                      className="h-20 w-20 overflow-hidden rounded-2xl"
-                    />
-                    <View className="flex-1 gap-2">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-semibold text-slate-900">
-                          第 {index + 1} 筆餐點
-                        </Text>
-                        <View className="flex-row items-center gap-2">
-                          {isSuccess && (
-                            <View className="rounded-full bg-emerald-100 px-3 py-1">
-                              <Text className="text-xs font-semibold text-emerald-700">
-                                已完成
-                              </Text>
-                            </View>
-                          )}
-                          {draft.status === "error" && (
-                            <View className="rounded-full bg-red-100 px-3 py-1">
-                              <Text className="text-xs font-semibold text-red-700">
-                                失敗
-                              </Text>
-                            </View>
-                          )}
-                          {isUploading && (
-                            <View className="rounded-full bg-blue-100 px-3 py-1">
-                              <Text className="text-xs font-semibold text-blue-700">
-                                上傳中
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                      <Text className="text-sm text-slate-500">
-                        {MEAL_LABEL_MAP[draft.label]}
-                      </Text>
-                      <Text className="text-sm text-slate-400">
-                        {draft.datetime.toLocaleString()}
-                      </Text>
-                      {draft.errorMessage ? (
-                        <Text className="text-sm text-red-500">
-                          {draft.errorMessage}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </View>
-                </Pressable>
-
-                {isExpanded && (
-                  <View className="gap-5 border-t border-slate-100 px-4 py-5">
-                    <View className="gap-2">
-                      <Text className="h3">餐別</Text>
-                      <View className="flex-row flex-wrap gap-2">
-                        {MEAL_LABEL_OPTIONS.map((option) => {
-                          const isActive = draft.label === option.value
-                          return (
-                            <Pressable
-                              key={option.value}
-                              onPress={() =>
-                                updateDraft(draft.id, (current) => ({
-                                  ...current,
-                                  label: option.value,
-                                  status:
-                                    current.status === "error" ? "idle" : current.status,
-                                  errorMessage: undefined,
-                                }))
-                              }
-                              className={`rounded-full border px-4 py-2 ${
-                                isActive
-                                  ? "border-blue-600 bg-blue-600"
-                                  : "border-slate-200 bg-slate-50"
-                              }`}
-                            >
-                              <Text
-                                className={`text-sm font-semibold ${
-                                  isActive ? "text-white" : "text-slate-600"
-                                }`}
-                              >
-                                {option.label}
-                              </Text>
-                            </Pressable>
-                          )
-                        })}
-                      </View>
-                      <Text className="text-xs text-slate-400">
-                        目前選擇：{MEAL_LABEL_MAP[draft.label]}
-                      </Text>
-                    </View>
-
-                    <TagInput
-                      tags={draft.tags}
-                      setTags={(nextTags) =>
-                        updateDraft(draft.id, (current) => ({
-                          ...current,
-                          tags: nextTags,
-                          status: current.status === "error" ? "idle" : current.status,
-                          errorMessage: undefined,
-                        }))
-                      }
-                      label="食物標籤"
-                    />
-
-                    <View className="gap-2">
-                      <Text className="h3">用餐時間</Text>
-                      <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
-                        <DateTimePicker
-                          value={draft.datetime}
-                          mode="datetime"
-                          display="default"
-                          onChange={(event, selectedDate) => {
-                            if (!selectedDate) return
-                            updateDraft(draft.id, (current) => ({
-                              ...current,
-                              datetime: selectedDate,
-                              status:
-                                current.status === "error" ? "idle" : current.status,
-                              errorMessage: undefined,
-                            }))
-                          }}
-                        />
-                      </View>
-                    </View>
-
-                    {!isSuccess && (
-                      <ThemeButton
-                        size={"md"}
-                        variant={"ghost"}
-                        title="移除這張照片"
-                        className="border border-red-200 bg-red-50"
-                        disabled={isSubmitting}
-                        onPress={() => removeDraft(draft.id)}
-                      />
-                    )}
-                  </View>
-                )}
-              </View>
-            )
-          })}
+          {drafts.map((draft, index) => (
+            <MealDraftCard
+              key={draft.id}
+              draft={draft}
+              index={index}
+              isExpanded={expandedDraftId === draft.id}
+              isSubmitting={isSubmitting}
+              onToggle={() =>
+                setExpandedDraftId((current) =>
+                  current === draft.id ? null : draft.id,
+                )
+              }
+              onUpdate={(updater) => updateDraft(draft.id, updater)}
+              onRemove={() => removeDraft(draft.id)}
+            />
+          ))}
         </View>
 
         <View className="mt-8 flex-row gap-3">

@@ -1,4 +1,5 @@
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,12 +14,14 @@ import DateTimePicker from "@react-native-community/datetimepicker"
 import ImageViewer from "@/components/imageViewer"
 import TagInput from "@/components/TagInput"
 import ThemeButton from "@/components/Button"
+import SuggestedTags from "@/components/SuggestedTags"
 import { supabase } from "@/lib/supabase.web"
 import {
   MEAL_LABEL_MAP,
   MEAL_LABEL_OPTIONS,
   type MealLabelKey,
 } from "@/constants/meal-label"
+import { useSuggestedMealTags } from "@/hooks/use-suggested-meal-tags"
 
 type FormValues = {
   label: MealLabelKey
@@ -56,12 +59,17 @@ export default function EditMealModalScreen() {
     [params.imgUri],
   )
 
-  const { control, handleSubmit, reset } = useForm<FormValues>({
+  const { control, handleSubmit, reset, watch } = useForm<FormValues>({
     defaultValues: {
       label: "breakfast",
       datetime: new Date(),
     },
   })
+  const currentLabel = watch("label")
+  const { suggestions, isLoading: isSuggestionsLoading } = useSuggestedMealTags(
+    currentLabel,
+    tags,
+  )
 
   useEffect(() => {
     const fetchMeal = async () => {
@@ -184,6 +192,48 @@ export default function EditMealModalScreen() {
     }
   }
 
+  const handleDeleteMeal = async () => {
+    if (!mealId || isFetching) return
+    setIsLoading(true)
+
+    try {
+      const { error: deleteLinkError } = await supabase
+        .from("meal_food_tags")
+        .delete()
+        .eq("meal_id", mealId)
+
+      if (deleteLinkError) throw deleteLinkError
+
+      const { error: deleteMealError } = await supabase
+        .from("meals")
+        .delete()
+        .eq("id", mealId)
+
+      if (deleteMealError) throw deleteMealError
+
+      router.back()
+    } catch (error) {
+      console.error("Failed to delete meal:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const confirmDeleteMeal = () => {
+    if (!mealId || isFetching || isLoading) return
+
+    Alert.alert("刪除餐點", "刪除後將無法復原，確定要刪除嗎？", [
+      { text: "取消", style: "cancel" },
+      {
+        text: "刪除",
+        style: "destructive",
+        onPress: () => {
+          void handleDeleteMeal()
+        },
+      },
+    ])
+  }
+
   return (
     <KeyboardAvoidingView
       className="flex-1 bg-slate-50"
@@ -252,6 +302,16 @@ export default function EditMealModalScreen() {
                 )}
               />
 
+              <SuggestedTags
+                suggestions={suggestions}
+                selectedTags={tags}
+                isLoading={isSuggestionsLoading}
+                onSelectTag={(tag) => {
+                  if (tags.includes(tag)) return
+                  setTags([...tags, tag])
+                }}
+              />
+
               <TagInput tags={tags} setTags={setTags} label="食物標籤" />
 
               <Controller
@@ -296,6 +356,15 @@ export default function EditMealModalScreen() {
             onPress={handleSubmit(handleUpdateMeal)}
           />
         </View>
+
+        <ThemeButton
+          size={"md"}
+          variant={"ghost"}
+          title={isLoading ? "處理中..." : "刪除餐點"}
+          className="mt-3 border border-red-200 bg-red-50"
+          disabled={isLoading || isFetching}
+          onPress={confirmDeleteMeal}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   )
