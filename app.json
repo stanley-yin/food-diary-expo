@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "expo-social-auth",
-    "slug": "expo-social-auth",
+    "slug": "food-diary",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.exposocialauth"
+      "bundleIdentifier": "com.stanleyyin.socialauth",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.exposocialauth"
+      "package": "com.stanleyyin.socialauth"
     },
     "web": {
       "output": "single",
@@ -50,8 +53,14 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "17d21c4e-219c-4aa3-ab2a-592cdfe09139"
+      }
+    },
+    "owner": "stanleyyins-organization"
   }
 }
