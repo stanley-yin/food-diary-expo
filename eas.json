@@ -1,0 +1,26 @@
+{
+  "cli": {
+    "version": ">= 18.7.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://cvmonyfdclnlptnhmmfy.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2bW9ueWZkY2xubHB0bmhtbWZ5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MTE3MTY3NSwiZXhwIjoyMDc2NzQ3Njc1fQ.R995dqTIQ77B3hDAH2sL9XZ8w5x01KcD8G22rWvyk88",
+        "EXPO_PUBLIC_GOOGLE_AUTH_WEB_CLIENT_ID": "956492699802-fmslt5tjolt14rcotigmbck1vkhadl12.apps.googleusercontent.com"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
