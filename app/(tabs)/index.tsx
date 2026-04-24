@@ -7,7 +7,6 @@ import {
   View,
 } from "react-native"
 import { useAuthContext } from "@/hooks/use-auth-context"
-import * as ImagePicker from "expo-image-picker"
 import { useRouter } from "expo-router"
 import { SafeAreaView } from "react-native-safe-area-context"
 import Octicons from "@expo/vector-icons/Octicons"
@@ -36,32 +35,6 @@ export default function HomeScreen() {
   const router = useRouter()
   const [meals, setMeals] = useState<mealItem[]>([])
   const [deletingMealId, setDeletingMealId] = useState<string | null>(null)
-
-  const onSelectImage = async () => {
-    const options: ImagePicker.ImagePickerOptions = {
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      exif: true, // 讀取圖片細節 metadata
-      allowsMultipleSelection: true,
-      selectionLimit: 0,
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync(options)
-    if (!result.canceled) {
-      const draftPayload = result.assets.map((asset) => ({
-        uri: asset.uri,
-        date: asset.exif?.DateTimeOriginal,
-        fileName: asset.fileName,
-        mimeType: asset.mimeType,
-      }))
-
-      router.push({
-        pathname: "/modal/confirm",
-        params: {
-          drafts: JSON.stringify(draftPayload),
-        },
-      })
-    }
-  }
 
   const onEditMeal = (meal: mealItem) => {
     router.push({
@@ -276,7 +249,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        onPress={onSelectImage}
+        onPress={() => router.push("/modal/camera")}
         className="!absolute bottom-12 right-8 z-10 h-16 w-16 items-center justify-center rounded-full bg-blue-600 shadow-xl shadow-blue-200"
       >
         <Octicons name="diff-added" size={30} color="white" />
