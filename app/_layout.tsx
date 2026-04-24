@@ -42,6 +42,13 @@ function RootNavigator() {
           title: "編輯餐點",
         }}
       />
+      <Stack.Screen
+        name="modal/camera"
+        options={{
+          presentation: "fullScreenModal",
+          headerShown: false,
+        }}
+      />
     </Stack>
   )
 }
