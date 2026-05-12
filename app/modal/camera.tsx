@@ -1,4 +1,4 @@
-import { CameraType, CameraView, useCameraPermissions } from "expo-camera"
+import { CameraView, useCameraPermissions } from "expo-camera"
 import { Image } from "expo-image"
 import * as ImagePicker from "expo-image-picker"
 import { useRef, useState } from "react"
@@ -6,12 +6,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native"
 import { SafeAreaView } from "react-native-safe-area-context"
 import { useRouter } from "expo-router"
 import Feather from "@expo/vector-icons/Feather"
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6"
 
 export default function CameraScreen() {
   const router = useRouter()
   const [permission, requestPermission] = useCameraPermissions()
-  const [facing, setFacing] = useState<CameraType>("back")
   const [capturedUri, setCapturedUri] = useState<string | null>(null)
   const [isCapturing, setIsCapturing] = useState(false)
   const cameraRef = useRef<CameraView>(null)
@@ -133,7 +131,7 @@ export default function CameraScreen() {
         <CameraView
           ref={cameraRef}
           style={StyleSheet.absoluteFillObject}
-          facing={facing}
+          facing="back"
         />
         <Pressable
           onPress={() => router.back()}
@@ -145,10 +143,10 @@ export default function CameraScreen() {
 
       <View className="flex-row items-center justify-between px-[30px] pb-4 pt-5">
         <Pressable
-          className="h-11 w-11 items-center justify-center rounded-full bg-black/40"
+          className="h-24 w-24 items-center justify-center rounded-2xl bg-black/40"
           onPress={handleSelectFromLibrary}
         >
-          <Feather name="image" size={22} color="white" />
+          <Feather name="image" size={36} color="white" />
         </Pressable>
         <Pressable
           onPress={handleCapture}
@@ -157,12 +155,7 @@ export default function CameraScreen() {
         >
           <View className="h-[68px] w-[68px] rounded-full bg-white" />
         </Pressable>
-        <Pressable
-          onPress={() => setFacing((f) => (f === "back" ? "front" : "back"))}
-          className="h-11 w-11 items-center justify-center rounded-full bg-black/40"
-        >
-          <FontAwesome6 name="rotate-left" size={22} color="white" />
-        </Pressable>
+        <View className="h-24 w-24" />
       </View>
     </SafeAreaView>
   )
