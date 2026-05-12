@@ -10,15 +10,16 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { useEffect, useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
-import DateTimePicker from "@react-native-community/datetimepicker"
 import ImageViewer from "@/components/imageViewer"
 import TagInput from "@/components/TagInput"
 import ThemeButton from "@/components/Button"
 import SuggestedTags from "@/components/SuggestedTags"
+import DateTimePickerField from "@/components/DateTimePickerField"
 import { supabase } from "@/lib/supabase.web"
 import {
   MEAL_LABEL_MAP,
   MEAL_LABEL_OPTIONS,
+  getMealLabelFromDate,
   type MealLabelKey,
 } from "@/constants/meal-label"
 import { useSuggestedMealTags } from "@/hooks/use-suggested-meal-tags"
@@ -59,13 +60,14 @@ export default function EditMealModalScreen() {
     [params.imgUri],
   )
 
-  const { control, handleSubmit, reset, watch } = useForm<FormValues>({
+  const { control, handleSubmit, reset, watch, setValue } = useForm<FormValues>({
     defaultValues: {
-      label: "breakfast",
+      label: getMealLabelFromDate(new Date()),
       datetime: new Date(),
     },
   })
   const currentLabel = watch("label")
+  const currentDatetime = watch("datetime")
   const { suggestions, isLoading: isSuggestionsLoading } = useSuggestedMealTags(
     currentLabel,
     tags,
@@ -265,6 +267,11 @@ export default function EditMealModalScreen() {
             <Text className="text-slate-500">資料讀取中...</Text>
           ) : (
             <>
+              <DateTimePickerField
+                value={currentDatetime}
+                onChange={(date) => setValue("datetime", date)}
+              />
+
               <Controller
                 control={control}
                 name="label"
@@ -313,26 +320,6 @@ export default function EditMealModalScreen() {
               />
 
               <TagInput tags={tags} setTags={setTags} label="食物標籤" />
-
-              <Controller
-                control={control}
-                name="datetime"
-                render={({ field: { onChange, value } }) => (
-                  <View className="gap-2">
-                    <Text className="h3">用餐時間</Text>
-                    <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
-                      <DateTimePicker
-                        value={value}
-                        mode="datetime"
-                        display="default"
-                        onChange={(event, selectedDate) => {
-                          if (selectedDate) onChange(selectedDate)
-                        }}
-                      />
-                    </View>
-                  </View>
-                )}
-              />
             </>
           )}
         </View>
