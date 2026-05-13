@@ -1,7 +1,7 @@
 import { SafeAreaView } from "react-native-safe-area-context"
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native"
 import { supabase } from "@/lib/supabase.web"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Image } from "expo-image"
 import { useFocusEffect } from "@react-navigation/native"
 import dayjs from "dayjs"
@@ -12,10 +12,11 @@ import {
   MEAL_LABEL_MAP,
   type MealLabelKey,
 } from "@/constants/meal-label"
+import { Gesture, GestureDetector } from "react-native-gesture-handler"
 
-const PAGE_SIZE = 10
 const SIGNED_URL_EXPIRES_IN = 60 * 60 * 24
 const REFRESH_INTERVAL_MS = 30 * 1000
+const DOW_LABELS = ["日", "一", "二", "三", "四", "五", "六"]
 
 type DiaryImageItem = {
   id: string
@@ -38,64 +39,52 @@ type MealRow = {
 
 type ViewMode = "grid" | "detail"
 
-const mergeUniqueDiaryItems = (
-  currentItems: DiaryImageItem[],
-  incomingItems: DiaryImageItem[],
-) => {
-  const itemMap = new Map(currentItems.map((item) => [item.id, item]))
-
-  for (const item of incomingItems) {
-    itemMap.set(item.id, item)
-  }
-
-  return [...itemMap.values()]
-}
-
 export default function Diary() {
   const router = useRouter()
+  const today = useMemo(() => dayjs().format("YYYY-MM-DD"), [])
+  const [selectedDate, setSelectedDate] = useState(today)
   const [images, setImages] = useState<DiaryImageItem[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(true)
-  const [isInitialLoading, setIsInitialLoading] = useState(true)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const lastRefreshAtRef = useRef(0)
-  const signedUrlCacheRef = useRef<
-    Record<string, { url: string; expiresAt: number }>
-  >({})
+  const signedUrlCacheRef = useRef<Record<string, { url: string; expiresAt: number }>>({})
 
-  const fetchPage = useCallback(async (targetPage: number, reset = false) => {
-    const from = targetPage * PAGE_SIZE
-    const to = from + PAGE_SIZE - 1
+  const weekDates = useMemo(() => {
+    const start = dayjs(selectedDate).startOf("week")
+    return Array.from({ length: 7 }, (_, i) =>
+      start.add(i, "day").format("YYYY-MM-DD"),
+    )
+  }, [selectedDate])
+
+  const weekLabel = useMemo(
+    () => dayjs(selectedDate).format("YYYY年M月"),
+    [selectedDate],
+  )
+
+  const fetchForDate = useCallback(async (date: string) => {
+    lastRefreshAtRef.current = Date.now()
+    setIsLoading(true)
+
+    const start = dayjs(date).startOf("day").toISOString()
+    const end = dayjs(date).endOf("day").toISOString()
 
     const { data, error } = await supabase
       .from("meals")
-      .select(
-        `
-        id,
-        img_url,
-        label,
-        datetime,
-        created_at,
-        food_tags (
-          id,
-          name
-        )
-      `,
-      )
+      .select(`id, img_url, label, datetime, created_at, food_tags (id, name)`)
+      .gte("datetime", start)
+      .lte("datetime", end)
       .order("datetime", { ascending: false })
-      .range(from, to)
 
     if (error) {
       console.error("Failed to fetch diary images:", error)
+      setIsLoading(false)
       return
     }
 
     const rows = (data || []) as MealRow[]
-
-    const rowsWithImagePath = rows.filter((row) => !!row.img_url)
+    const rowsWithImage = rows.filter((row) => !!row.img_url)
     const now = Date.now()
-    const pathsToSign = rowsWithImagePath
+    const pathsToSign = rowsWithImage
       .map((row) => row.img_url)
       .filter((path) => {
         const cached = signedUrlCacheRef.current[path]
@@ -107,9 +96,7 @@ export default function Diary() {
         .from("avatars")
         .createSignedUrls(pathsToSign, SIGNED_URL_EXPIRES_IN)
 
-      if (signedBatchError) {
-        console.error("Failed to create signed urls:", signedBatchError)
-      } else {
+      if (!signedBatchError) {
         for (const item of signedBatch || []) {
           if (!item.path || !item.signedUrl) continue
           signedUrlCacheRef.current[item.path] = {
@@ -120,73 +107,66 @@ export default function Diary() {
       }
     }
 
-    const urlResults = rowsWithImagePath.map((row) => ({
-      id: row.id,
-      imagePath: row.img_url,
-      signedUrl: signedUrlCacheRef.current[row.img_url]?.url || "",
-      label: row.label,
-      datetime: row.datetime,
-      createdAt: row.created_at,
-      foodTags: row.food_tags || [],
-    }))
+    const nextItems = rowsWithImage
+      .map((row) => ({
+        id: row.id,
+        imagePath: row.img_url,
+        signedUrl: signedUrlCacheRef.current[row.img_url]?.url || "",
+        label: row.label,
+        datetime: row.datetime,
+        createdAt: row.created_at,
+        foodTags: row.food_tags || [],
+      }))
+      .filter((item) => !!item.signedUrl)
 
-    const nextItems = urlResults.filter((item) => !!item.signedUrl)
-    setImages((prev) => (reset ? nextItems : mergeUniqueDiaryItems(prev, nextItems)))
-    setHasMore(rows.length === PAGE_SIZE)
-    setPage(targetPage)
+    setImages(nextItems)
+    setIsLoading(false)
   }, [])
 
-  const refresh = useCallback(async () => {
-    setIsInitialLoading(true)
-    setHasMore(true)
-    await fetchPage(0, true)
-    setIsInitialLoading(false)
-  }, [fetchPage])
-
-  const loadMore = useCallback(async () => {
-    if (isInitialLoading || isLoadingMore || !hasMore) return
-    setIsLoadingMore(true)
-    await fetchPage(page + 1, false)
-    setIsLoadingMore(false)
-  }, [fetchPage, hasMore, isInitialLoading, isLoadingMore, page])
+  useEffect(() => {
+    fetchForDate(selectedDate)
+  }, [fetchForDate, selectedDate])
 
   useFocusEffect(
     useCallback(() => {
       const now = Date.now()
-      const shouldSkipRefresh =
-        images.length > 0 && now - lastRefreshAtRef.current < REFRESH_INTERVAL_MS
-
-      if (shouldSkipRefresh) return
-      lastRefreshAtRef.current = now
-      refresh()
-    }, [images.length, refresh]),
+      if (now - lastRefreshAtRef.current < REFRESH_INTERVAL_MS) return
+      fetchForDate(selectedDate)
+    }, [fetchForDate, selectedDate]),
   )
 
-  const getDateKey = (item: DiaryImageItem) =>
-    dayjs(item.datetime || item.createdAt).format("YYYY-MM-DD")
+  const goToPrevWeek = useCallback(() => {
+    setSelectedDate(dayjs(selectedDate).subtract(7, "day").format("YYYY-MM-DD"))
+  }, [selectedDate])
+
+  const goToNextWeek = useCallback(() => {
+    const next = dayjs(selectedDate).add(7, "day")
+    setSelectedDate(next.format("YYYY-MM-DD") <= today ? next.format("YYYY-MM-DD") : today)
+  }, [selectedDate, today])
+
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .runOnJS(true)
+        .activeOffsetX([-30, 30])
+        .failOffsetY([-20, 20])
+        .onEnd((e) => {
+          if (Math.abs(e.translationX) < 50) return
+          if (e.translationX > 0) goToPrevWeek()
+          else goToNextWeek()
+        }),
+    [goToPrevWeek, goToNextWeek],
+  )
 
   const openEditMeal = (item: DiaryImageItem) =>
     router.push({
       pathname: "/modal/edit-meal",
-      params: {
-        mealId: item.id,
-        imgUri: item.signedUrl,
-      },
+      params: { mealId: item.id, imgUri: item.signedUrl },
     })
 
-  const renderItem = ({
-    item,
-    index,
-  }: {
-    item: DiaryImageItem
-    index: number
-  }) => {
+
+  const renderItem = ({ item }: { item: DiaryImageItem }) => {
     const current = dayjs(item.datetime || item.createdAt)
-    const monthText = current.format("M月")
-    const dayText = current.format("D")
-    const currentKey = getDateKey(item)
-    const prevKey = index > 0 ? getDateKey(images[index - 1]) : null
-    const shouldShowDateBadge = currentKey !== prevKey
 
     if (viewMode === "detail") {
       return (
@@ -195,51 +175,18 @@ export default function Diary() {
             onPress={() => openEditMeal(item)}
             className="overflow-hidden rounded-3xl border border-slate-200 bg-white"
           >
-            <View className="relative">
-              <ImageViewer
-                imgSource={item.signedUrl}
-                selectedImage={item.signedUrl}
-                className="h-56 w-full"
-              />
-              {shouldShowDateBadge && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: 12,
-                    left: 12,
-                    width: 48,
-                    height: 56,
-                    borderRadius: 14,
-                    backgroundColor: "rgba(0,0,0,0.55)",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>
-                    {monthText}
-                  </Text>
-                  <Text
-                    style={{
-                      color: "#fff",
-                      fontSize: 24,
-                      fontWeight: "800",
-                      lineHeight: 26,
-                    }}
-                  >
-                    {dayText}
-                  </Text>
-                </View>
-              )}
-            </View>
-
+            <ImageViewer
+              imgSource={item.signedUrl}
+              selectedImage={item.signedUrl}
+              className="h-56 w-full"
+            />
             <View className="gap-3 px-4 py-4">
               <View className="flex-row items-center justify-between">
                 {!!item.label ? (
                   <View
                     className="rounded-full px-3 py-1"
                     style={{
-                      backgroundColor:
-                        MEAL_LABEL_BADGE_STYLES[item.label].backgroundColor,
+                      backgroundColor: MEAL_LABEL_BADGE_STYLES[item.label].backgroundColor,
                     }}
                   >
                     <Text
@@ -251,18 +198,14 @@ export default function Diary() {
                   </View>
                 ) : (
                   <View className="rounded-full bg-slate-100 px-3 py-1">
-                    <Text className="text-xs font-semibold text-slate-500">
-                      未設定
-                    </Text>
+                    <Text className="text-xs font-semibold text-slate-500">未設定</Text>
                   </View>
                 )}
                 <Text className="text-xs font-medium text-slate-400">
-                  {current.format("YYYY/MM/DD HH:mm")}
+                  {current.format("HH:mm")}
                 </Text>
               </View>
-
               <View className="h-px bg-slate-100" />
-
               <View className="flex-row flex-wrap gap-2">
                 {item.foodTags.length === 0 && (
                   <Text className="text-sm text-slate-400">尚未標註食物標籤</Text>
@@ -272,9 +215,7 @@ export default function Diary() {
                     key={`${item.id}-${tag.id}`}
                     className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1"
                   >
-                    <Text className="text-xs font-medium text-blue-700">
-                      {tag.name}
-                    </Text>
+                    <Text className="text-xs font-medium text-blue-700">{tag.name}</Text>
                   </View>
                 ))}
               </View>
@@ -296,97 +237,126 @@ export default function Diary() {
             contentFit="cover"
             cachePolicy="memory-disk"
           />
-          {shouldShowDateBadge && (
-            <View
-              style={{
-                position: "absolute",
-                top: 8,
-                left: 8,
-                width: 44,
-                height: 52,
-                borderRadius: 12,
-                backgroundColor: "rgba(0,0,0,0.55)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>
-                {monthText}
-              </Text>
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 22,
-                  fontWeight: "800",
-                  lineHeight: 24,
-                }}
-              >
-                {dayText}
-              </Text>
-            </View>
-          )}
+          <View
+            style={{
+              position: "absolute",
+              bottom: 6,
+              left: 6,
+              borderRadius: 8,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              paddingHorizontal: 6,
+              paddingVertical: 2,
+            }}
+          >
+            <Text style={{ color: "#fff", fontSize: 10, fontWeight: "600" }}>
+              {current.format("HH:mm")}
+            </Text>
+          </View>
         </Pressable>
       </View>
     )
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50 px-2 pt-2">
-      <View className="flex-row justify-end gap-2 px-2 pb-3">
+    <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
+      <View className="border-b border-slate-100 bg-white px-4 pb-2 pt-3">
+        <Text className="mb-2 text-xs font-semibold text-slate-400">{weekLabel}</Text>
+        <View className="flex-row">
+          {weekDates.map((date) => {
+            const d = dayjs(date)
+            const isSelected = date === selectedDate
+            const isToday = date === today
+            const isFuture = date > today
+            return (
+              <Pressable
+                key={date}
+                onPress={() => !isFuture && setSelectedDate(date)}
+                disabled={isFuture}
+                className="flex-1 items-center pb-1"
+              >
+                <Text
+                  className={`text-xs ${
+                    isSelected
+                      ? "font-semibold text-blue-600"
+                      : isFuture
+                        ? "text-slate-200"
+                        : "text-slate-400"
+                  }`}
+                >
+                  {DOW_LABELS[d.day()]}
+                </Text>
+                <View
+                  className={`mt-0.5 h-8 w-8 items-center justify-center rounded-full ${isSelected ? "bg-blue-600" : ""}`}
+                >
+                  <Text
+                    className={`text-sm font-semibold ${
+                      isSelected
+                        ? "text-white"
+                        : isFuture
+                          ? "text-slate-300"
+                          : isToday
+                            ? "text-blue-600"
+                            : "text-slate-700"
+                    }`}
+                  >
+                    {d.format("D")}
+                  </Text>
+                </View>
+                {isToday && !isSelected && (
+                  <View className="mt-0.5 h-1 w-1 rounded-full bg-blue-500" />
+                )}
+              </Pressable>
+            )
+          })}
+        </View>
+      </View>
+
+      <View className="flex-row justify-end gap-2 px-4 py-2">
         <Pressable
           onPress={() => setViewMode("grid")}
-          className={`rounded-full px-4 py-2 ${
-            viewMode === "grid" ? "bg-blue-600" : "bg-white"
-          }`}
+          className={`rounded-full px-4 py-2 ${viewMode === "grid" ? "bg-blue-600" : "bg-white"}`}
         >
           <Text
-            className={`text-sm font-semibold ${
-              viewMode === "grid" ? "text-white" : "text-slate-600"
-            }`}
+            className={`text-sm font-semibold ${viewMode === "grid" ? "text-white" : "text-slate-600"}`}
           >
             多格
           </Text>
         </Pressable>
         <Pressable
           onPress={() => setViewMode("detail")}
-          className={`rounded-full px-4 py-2 ${
-            viewMode === "detail" ? "bg-blue-600" : "bg-white"
-          }`}
+          className={`rounded-full px-4 py-2 ${viewMode === "detail" ? "bg-blue-600" : "bg-white"}`}
         >
           <Text
-            className={`text-sm font-semibold ${
-              viewMode === "detail" ? "text-white" : "text-slate-600"
-            }`}
+            className={`text-sm font-semibold ${viewMode === "detail" ? "text-white" : "text-slate-600"}`}
           >
             詳細
           </Text>
         </Pressable>
       </View>
 
-      {isInitialLoading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="small" color="#2563eb" />
+      <GestureDetector gesture={swipeGesture}>
+        <View className="flex-1">
+          {isLoading ? (
+            <View className="flex-1 items-center justify-center">
+              <ActivityIndicator size="small" color="#2563eb" />
+            </View>
+          ) : images.length === 0 ? (
+            <View className="flex-1 items-center justify-center gap-2">
+              <Text className="text-base font-semibold text-slate-300">這天沒有餐點記錄</Text>
+            </View>
+          ) : (
+            <FlatList
+              key={viewMode}
+              data={images}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              numColumns={viewMode === "grid" ? 3 : 1}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: 32, paddingHorizontal: 8 }}
+            />
+          )}
         </View>
-      ) : (
-        <FlatList
-          key={viewMode}
-          data={images}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          numColumns={viewMode === "grid" ? 3 : 1}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.3}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 32 }}
-          ListFooterComponent={
-            isLoadingMore ? (
-              <View className="py-3">
-                <ActivityIndicator size="small" color="#2563eb" />
-              </View>
-            ) : null
-          }
-        />
-      )}
+      </GestureDetector>
     </SafeAreaView>
   )
 }
