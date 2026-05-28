@@ -13,14 +13,15 @@ import * as FileSystem from "expo-file-system/legacy"
 import { decode } from "base64-arraybuffer"
 import { supabase } from "@/lib/supabase.web"
 import { useEffect, useMemo, useState } from "react"
-import DateTimePicker from "@react-native-community/datetimepicker"
 import ThemeButton from "@/components/Button"
+import DateTimePickerField from "@/components/DateTimePickerField"
 import TagInput from "@/components/TagInput"
 import SuggestedTags from "@/components/SuggestedTags"
 import {
   MEAL_LABEL_BADGE_STYLES,
   MEAL_LABEL_MAP,
   MEAL_LABEL_OPTIONS,
+  getMealLabelFromDate,
   type MealLabelKey,
 } from "@/constants/meal-label"
 import { useSuggestedMealTags } from "@/hooks/use-suggested-meal-tags"
@@ -135,6 +136,18 @@ function MealDraftCard({
 
       {isExpanded && (
         <View className="gap-5 border-t border-slate-100 px-4 py-5">
+          <DateTimePickerField
+            value={draft.datetime}
+            onChange={(date) =>
+              onUpdate((current) => ({
+                ...current,
+                datetime: date,
+                status: current.status === "error" ? "idle" : current.status,
+                errorMessage: undefined,
+              }))
+            }
+          />
+
           <View className="gap-2">
             <Text className="h3">餐別</Text>
             <View className="flex-row flex-wrap gap-2">
@@ -168,9 +181,6 @@ function MealDraftCard({
                 )
               })}
             </View>
-            <Text className="text-xs text-slate-400">
-              目前選擇：{MEAL_LABEL_MAP[draft.label]}
-            </Text>
           </View>
 
           <SuggestedTags
@@ -200,26 +210,6 @@ function MealDraftCard({
             }
             label="食物標籤"
           />
-
-          <View className="gap-2">
-            <Text className="h3">用餐時間</Text>
-            <View className="rounded-xl border border-slate-200 bg-slate-50 px-2 py-1">
-              <DateTimePicker
-                value={draft.datetime}
-                mode="datetime"
-                display="default"
-                onChange={(event, selectedDate) => {
-                  if (!selectedDate) return
-                  onUpdate((current) => ({
-                    ...current,
-                    datetime: selectedDate,
-                    status: current.status === "error" ? "idle" : current.status,
-                    errorMessage: undefined,
-                  }))
-                }}
-              />
-            </View>
-          </View>
 
           {!isSuccess && (
             <ThemeButton
@@ -262,16 +252,19 @@ export default function ConfirmModalScreen() {
   useEffect(() => {
     const nextDrafts = draftParams
       .filter((item) => !!item.uri)
-      .map((item, index) => ({
-        id: `${Date.now()}-${index}`,
-        imgUri: item.uri || "",
-        fileName: item.fileName,
-        mimeType: item.mimeType,
-        datetime: parseExifDate(item.date),
-        label: "breakfast" as MealLabelKey,
-        tags: [],
-        status: "idle" as const,
-      }))
+      .map((item, index) => {
+        const datetime = parseExifDate(item.date)
+        return {
+          id: `${Date.now()}-${index}`,
+          imgUri: item.uri || "",
+          fileName: item.fileName,
+          mimeType: item.mimeType,
+          datetime,
+          label: getMealLabelFromDate(datetime),
+          tags: [],
+          status: "idle" as const,
+        }
+      })
 
     setDrafts(nextDrafts)
     setExpandedDraftId(nextDrafts[0]?.id ?? null)
