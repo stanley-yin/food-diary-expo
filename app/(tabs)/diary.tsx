@@ -172,6 +172,32 @@ export default function Diary() {
     }, [fetchForDate, fetchDatesWithData, selectedDate]),
   )
 
+  const goToPrevDay = useCallback(() => {
+    setSelectedDate((prev) => dayjs(prev).subtract(1, "day").format("YYYY-MM-DD"))
+  }, [])
+
+  const goToNextDay = useCallback(() => {
+    setSelectedDate((prev) => {
+      const next = dayjs(prev).add(1, "day")
+      return next.format("YYYY-MM-DD") <= today ? next.format("YYYY-MM-DD") : today
+    })
+  }, [today])
+
+  const daySwipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-20, 20])
+        .failOffsetY([-15, 15])
+        .onEnd((e) => {
+          const shouldNavigate = Math.abs(e.translationX) > 40 || Math.abs(e.velocityX) > 400
+          if (!shouldNavigate) return
+          const goingBack = e.velocityX > 0 || (e.velocityX === 0 && e.translationX > 0)
+          if (goingBack) runOnJS(goToPrevDay)()
+          else runOnJS(goToNextDay)()
+        }),
+    [goToPrevDay, goToNextDay],
+  )
+
   const didSwipeRef = useRef(false)
 
   const onSwipeComplete = useCallback((goingBack: boolean) => {
@@ -325,8 +351,8 @@ export default function Diary() {
   }
 
   return (
-    <GestureDetector gesture={swipeGesture}>
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
+      <GestureDetector gesture={swipeGesture}>
       <View className="border-b border-slate-100 bg-white" style={{ overflow: "hidden" }}>
         <Animated.View
           style={[{ flexDirection: "row", width: SCREEN_WIDTH * 3 }, calendarContainerStyle]}
@@ -390,6 +416,7 @@ export default function Diary() {
           ))}
         </Animated.View>
       </View>
+      </GestureDetector>
 
       <View className="flex-row justify-end gap-2 px-4 py-2">
         <Pressable
@@ -414,7 +441,8 @@ export default function Diary() {
         </Pressable>
       </View>
 
-      <View className="flex-1">
+      <GestureDetector gesture={daySwipeGesture}>
+        <View className="flex-1">
           {isLoading ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator size="small" color="#2563eb" />
@@ -435,7 +463,7 @@ export default function Diary() {
             />
           )}
         </View>
+      </GestureDetector>
     </SafeAreaView>
-    </GestureDetector>
   )
 }
