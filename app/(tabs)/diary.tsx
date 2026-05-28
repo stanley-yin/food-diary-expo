@@ -1,7 +1,7 @@
 import { SafeAreaView } from "react-native-safe-area-context"
-import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, Dimensions, FlatList, Pressable, Text, View } from "react-native"
 import { supabase } from "@/lib/supabase.web"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Image } from "expo-image"
 import { useFocusEffect } from "@react-navigation/native"
 import dayjs from "dayjs"
@@ -13,10 +13,17 @@ import {
   type MealLabelKey,
 } from "@/constants/meal-label"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated"
 
 const SIGNED_URL_EXPIRES_IN = 60 * 60 * 24
 const REFRESH_INTERVAL_MS = 30 * 1000
 const DOW_LABELS = ["日", "一", "二", "三", "四", "五", "六"]
+const SCREEN_WIDTH = Dimensions.get("window").width
 
 type DiaryImageItem = {
   id: string
@@ -46,8 +53,10 @@ export default function Diary() {
   const [images, setImages] = useState<DiaryImageItem[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [isLoading, setIsLoading] = useState(true)
+  const [datesWithData, setDatesWithData] = useState<Set<string>>(new Set())
   const lastRefreshAtRef = useRef(0)
   const signedUrlCacheRef = useRef<Record<string, { url: string; expiresAt: number }>>({})
+  const panX = useSharedValue(0)
 
   const weekDates = useMemo(() => {
     const start = dayjs(selectedDate).startOf("week")
@@ -56,10 +65,15 @@ export default function Diary() {
     )
   }, [selectedDate])
 
-  const weekLabel = useMemo(
-    () => dayjs(selectedDate).format("YYYY年M月"),
-    [selectedDate],
-  )
+  const prevWeekDates = useMemo(() => {
+    const start = dayjs(selectedDate).subtract(7, "day").startOf("week")
+    return Array.from({ length: 7 }, (_, i) => start.add(i, "day").format("YYYY-MM-DD"))
+  }, [selectedDate])
+
+  const nextWeekDates = useMemo(() => {
+    const start = dayjs(selectedDate).add(7, "day").startOf("week")
+    return Array.from({ length: 7 }, (_, i) => start.add(i, "day").format("YYYY-MM-DD"))
+  }, [selectedDate])
 
   const fetchForDate = useCallback(async (date: string) => {
     lastRefreshAtRef.current = Date.now()
@@ -123,39 +137,92 @@ export default function Diary() {
     setIsLoading(false)
   }, [])
 
+  const fetchDatesWithData = useCallback(async (anchorDate: string) => {
+    const rangeStart = dayjs(anchorDate).subtract(7, "day").startOf("week").startOf("day").toISOString()
+    const rangeEnd = dayjs(anchorDate).add(7, "day").endOf("week").endOf("day").toISOString()
+
+    const { data, error } = await supabase
+      .from("meals")
+      .select("datetime, created_at")
+      .not("img_url", "is", null)
+      .gte("datetime", rangeStart)
+      .lte("datetime", rangeEnd)
+
+    if (error || !data) return
+
+    setDatesWithData(
+      new Set(data.map((row) => dayjs(row.datetime || row.created_at).format("YYYY-MM-DD"))),
+    )
+  }, [])
+
   useEffect(() => {
     fetchForDate(selectedDate)
   }, [fetchForDate, selectedDate])
+
+  useEffect(() => {
+    fetchDatesWithData(selectedDate)
+  }, [fetchDatesWithData, selectedDate])
 
   useFocusEffect(
     useCallback(() => {
       const now = Date.now()
       if (now - lastRefreshAtRef.current < REFRESH_INTERVAL_MS) return
       fetchForDate(selectedDate)
-    }, [fetchForDate, selectedDate]),
+      fetchDatesWithData(selectedDate)
+    }, [fetchForDate, fetchDatesWithData, selectedDate]),
   )
 
-  const goToPrevWeek = useCallback(() => {
-    setSelectedDate(dayjs(selectedDate).subtract(7, "day").format("YYYY-MM-DD"))
-  }, [selectedDate])
+  const didSwipeRef = useRef(false)
 
-  const goToNextWeek = useCallback(() => {
-    const next = dayjs(selectedDate).add(7, "day")
-    setSelectedDate(next.format("YYYY-MM-DD") <= today ? next.format("YYYY-MM-DD") : today)
-  }, [selectedDate, today])
+  const onSwipeComplete = useCallback((goingBack: boolean) => {
+    didSwipeRef.current = true
+    setSelectedDate((prev) => {
+      if (goingBack) return dayjs(prev).subtract(7, "day").format("YYYY-MM-DD")
+      const next = dayjs(prev).add(7, "day")
+      return next.format("YYYY-MM-DD") <= today ? next.format("YYYY-MM-DD") : today
+    })
+  }, [today])
+
+  // Reset panX after React has committed the new week data, eliminating the jitter
+  useLayoutEffect(() => {
+    if (didSwipeRef.current) {
+      didSwipeRef.current = false
+      panX.value = 0
+    }
+  }, [selectedDate, panX])
+
+  // Container starts offset -SCREEN_WIDTH so the middle panel is visible
+  const calendarContainerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -SCREEN_WIDTH + panX.value }],
+  }))
 
   const swipeGesture = useMemo(
     () =>
       Gesture.Pan()
-        .runOnJS(true)
-        .activeOffsetX([-30, 30])
-        .failOffsetY([-20, 20])
+        .activeOffsetX([-15, 15])
+        .failOffsetY([-15, 15])
+        .onUpdate((e) => {
+          panX.value = e.translationX
+        })
         .onEnd((e) => {
-          if (Math.abs(e.translationX) < 50) return
-          if (e.translationX > 0) goToPrevWeek()
-          else goToNextWeek()
+          const shouldNavigate = Math.abs(e.translationX) > 40 || Math.abs(e.velocityX) > 400
+          if (shouldNavigate) {
+            const goingBack = e.velocityX > 0 || (e.velocityX === 0 && e.translationX > 0)
+            const target = goingBack ? SCREEN_WIDTH : -SCREEN_WIDTH
+            panX.value = withSpring(
+              target,
+              { damping: 40, stiffness: 400, mass: 0.8 },
+              (finished) => {
+                if (!finished) return
+                runOnJS(onSwipeComplete)(goingBack)
+                // panX reset is handled by useLayoutEffect after React re-renders
+              },
+            )
+          } else {
+            panX.value = withSpring(0, { damping: 20, stiffness: 300 })
+          }
         }),
-    [goToPrevWeek, goToNextWeek],
+    [onSwipeComplete, panX],
   )
 
   const openEditMeal = (item: DiaryImageItem) =>
@@ -258,57 +325,70 @@ export default function Diary() {
   }
 
   return (
+    <GestureDetector gesture={swipeGesture}>
     <SafeAreaView className="flex-1 bg-slate-50" edges={["top"]}>
-      <View className="border-b border-slate-100 bg-white px-4 pb-2 pt-3">
-        <Text className="mb-2 text-xs font-semibold text-slate-400">{weekLabel}</Text>
-        <View className="flex-row">
-          {weekDates.map((date) => {
-            const d = dayjs(date)
-            const isSelected = date === selectedDate
-            const isToday = date === today
-            const isFuture = date > today
-            return (
-              <Pressable
-                key={date}
-                onPress={() => !isFuture && setSelectedDate(date)}
-                disabled={isFuture}
-                className="flex-1 items-center pb-1"
-              >
-                <Text
-                  className={`text-xs ${
-                    isSelected
-                      ? "font-semibold text-blue-600"
-                      : isFuture
-                        ? "text-slate-200"
-                        : "text-slate-400"
-                  }`}
-                >
-                  {DOW_LABELS[d.day()]}
-                </Text>
-                <View
-                  className={`mt-0.5 h-8 w-8 items-center justify-center rounded-full ${isSelected ? "bg-blue-600" : ""}`}
-                >
-                  <Text
-                    className={`text-sm font-semibold ${
-                      isSelected
-                        ? "text-white"
-                        : isFuture
-                          ? "text-slate-300"
-                          : isToday
-                            ? "text-blue-600"
-                            : "text-slate-700"
-                    }`}
-                  >
-                    {d.format("D")}
-                  </Text>
-                </View>
-                {isToday && !isSelected && (
-                  <View className="mt-0.5 h-1 w-1 rounded-full bg-blue-500" />
-                )}
-              </Pressable>
-            )
-          })}
-        </View>
+      <View className="border-b border-slate-100 bg-white" style={{ overflow: "hidden" }}>
+        <Animated.View
+          style={[{ flexDirection: "row", width: SCREEN_WIDTH * 3 }, calendarContainerStyle]}
+        >
+          {[prevWeekDates, weekDates, nextWeekDates].map((dates, panelIdx) => (
+            <View key={panelIdx} style={{ width: SCREEN_WIDTH }} className="px-4 pb-2 pt-3">
+              <Text className="mb-2 text-xs font-semibold text-slate-400">
+                {dayjs(dates[3]).format("YYYY年M月")}
+              </Text>
+              <View className="flex-row">
+                {dates.map((date) => {
+                  const d = dayjs(date)
+                  const isSelected = date === selectedDate
+                  const isToday = date === today
+                  const isFuture = date > today
+                  return (
+                    <Pressable
+                      key={date}
+                      onPress={() => !isFuture && setSelectedDate(date)}
+                      disabled={isFuture}
+                      className="flex-1 items-center pb-1"
+                    >
+                      <Text
+                        className={`text-xs ${
+                          isSelected
+                            ? "font-semibold text-blue-600"
+                            : isFuture
+                              ? "text-slate-200"
+                              : "text-slate-400"
+                        }`}
+                      >
+                        {DOW_LABELS[d.day()]}
+                      </Text>
+                      <View
+                        className={`mt-0.5 h-8 w-8 items-center justify-center rounded-full ${isSelected ? "bg-blue-600" : ""}`}
+                      >
+                        <Text
+                          className={`text-sm font-semibold ${
+                            isSelected
+                              ? "text-white"
+                              : isFuture
+                                ? "text-slate-300"
+                                : isToday
+                                  ? "text-blue-600"
+                                  : "text-slate-700"
+                          }`}
+                        >
+                          {d.format("D")}
+                        </Text>
+                      </View>
+                      {!isSelected && (datesWithData.has(date) || isToday) && (
+                        <View
+                          className={`mt-0.5 h-1 w-1 rounded-full ${datesWithData.has(date) ? "bg-red-400" : "bg-blue-500"}`}
+                        />
+                      )}
+                    </Pressable>
+                  )
+                })}
+              </View>
+            </View>
+          ))}
+        </Animated.View>
       </View>
 
       <View className="flex-row justify-end gap-2 px-4 py-2">
@@ -334,8 +414,7 @@ export default function Diary() {
         </Pressable>
       </View>
 
-      <GestureDetector gesture={swipeGesture}>
-        <View className="flex-1">
+      <View className="flex-1">
           {isLoading ? (
             <View className="flex-1 items-center justify-center">
               <ActivityIndicator size="small" color="#2563eb" />
@@ -356,7 +435,7 @@ export default function Diary() {
             />
           )}
         </View>
-      </GestureDetector>
     </SafeAreaView>
+    </GestureDetector>
   )
 }
